@@ -1,0 +1,731 @@
+/* mitigation-planner.css */
+
+/* ===== Const for layout ===== */
+body.theme-light :root {
+  --mp-skill-col-w: 3.0rem;   /* スキル列の幅（縮小） */
+  --mp-skill-col-stack-w: 3.8rem; /* スタックスキルの幅（縮小） */
+  --mp-col-mech-w: 5.1rem;
+  --mp-col-time-w: 4.25rem;
+  --mp-col-event-w: 14rem;
+  --mp-col-elem-w: 3.6rem;
+  --mp-col-dmg-w: 6.0rem;    /* ダメージ列の幅（縮小） */
+}
+
+/* ========== Layout ========== */
+
+body.theme-light .mp-shell {
+  max-width: none;
+  margin: 0 auto;
+}
+
+body.theme-light .mp-wrapper {
+  position: relative;
+  margin-top: 0.5rem;
+  overflow: auto;
+  /* 画面の高さを最大限活用するように調整 */
+  max-height: calc(100vh - 180px);
+}
+
+body.theme-light .mp-table {
+  width: auto;
+  border-collapse: collapse;
+  border-spacing: 0;
+  background: #f2f2f2;
+  margin: 0 auto;
+  table-layout: fixed;        
+}
+
+body.theme-light .mp-table thead {
+  background: #e2e8f0;
+}
+
+body.theme-light .mp-table th {
+  border: none;
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #0f172a;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+body.theme-light .mp-table td {
+  border: none;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  color: #0f172a;
+}
+
+body.theme-light .mp-row td {
+  border-top: 2px solid #cbd5e1;
+}
+
+/* ========= 1. Header sticky ========= */
+
+body.theme-light thead.mp-header-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: #f2f2f2;
+}
+
+body.theme-light thead.mp-header-sticky th {
+  background: #f2f2f2;
+  border-bottom: 0;
+}
+
+body.theme-light thead.mp-header-sticky tr:last-child th {
+  border-bottom: 2px solid #cbd5e1; 
+}
+
+/* ========= 2. Sticky columns (left side) ========= */
+
+body.theme-light th.mp-col-freeze,
+body.theme-light td.mp-col-freeze {
+  position: sticky;
+  left: var(--mp-freeze-left, 0);
+  background: #f2f2f2;
+  border-right-color: transparent;
+}
+
+body.theme-light th.mp-col-freeze--first,
+body.theme-light td.mp-col-freeze--first {
+  z-index: 42;
+}
+
+body.theme-light th.mp-col-freeze--middle,
+body.theme-light td.mp-col-freeze--middle {
+  z-index: 41;
+}
+
+body.theme-light th.mp-col-freeze--last,
+body.theme-light td.mp-col-freeze--last {
+  z-index: 40;
+}
+
+/* Cover up skill-bar overflow */
+body.theme-light td.mp-col-freeze::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  bottom: -1px;
+  background: #f2f2f2;
+  box-shadow:
+    0 1px 0 #cbd5e1,
+    0 -1px 0 #cbd5e1;
+  pointer-events: none;
+  z-index: -1;
+}
+
+body.theme-light th.mp-col-freeze::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  bottom: -1px;
+  background: #f2f2f2;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Vertical line */
+body.theme-light th.mp-col-freeze::after,
+body.theme-light td.mp-col-freeze::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 1px;
+  background-color: #cbd5e1;
+  pointer-events: none;
+}
+
+/* ========= 3. Vertical line ========= */
+
+body.theme-light .mp-table thead th:not(.mp-col-freeze),
+body.theme-light .mp-table tbody td:not(.mp-col-freeze) {
+  border-right: 1px solid #cbd5e1;
+}
+
+body.theme-light .mp-table thead tr th:last-child,
+body.theme-light .mp-table tbody tr td:last-child {
+  border-right: none;
+}
+
+/* ========= 4. Hover ========= */
+
+body.theme-light .mp-row:hover td:not(.mp-col-freeze) {
+  background-color: rgba(109, 40, 217, 0.12);
+}
+
+/* Hover highlight 2 vertical lines */
+body.theme-light .mp-row:hover td.mp-col-freeze:not(.mp-col-freeze--first)::after {
+  background-color: #7c3aed;  /* purple-600 */
+}
+
+/* ========== Job picker buttons (top bar icons) ========== */
+
+body.theme-light .job-button {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  border: none;
+}
+
+body.theme-light .job-button:focus {
+  outline: none;
+}
+
+body.theme-light .job-button-unselected {
+  box-shadow: none;
+}
+
+body.theme-light .job-button-unselected:hover {
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.9); /* slate border */
+}
+
+body.theme-light .job-button-selected {
+  border-radius: 0.5rem;
+  box-shadow:
+    0 0 0 1px #7c3aed,
+    0 0 14px rgba(129, 140, 248, 0.75);
+}
+
+body.theme-light .job-button-selected img {
+  transform: translateY(-0.5px);
+}
+
+/* ========== Skill cells & vertical bars ========== */
+
+body.theme-light .mp-cell {
+  position: relative;
+  padding: 0 6px;
+}
+
+body.theme-light .mp-job-header {
+  padding: 0.25rem 0;
+  text-align: center;
+  z-index: 70;
+  min-width: 3.5rem; /* アイコンとボタンが隠れないように最小幅を確保 */
+}
+
+/* Job header background color */
+body.theme-light .mp-header-sticky tr:first-child th.mp-job-header--tank {
+  background: linear-gradient(to bottom, #cbd5e1, #f2f2f2);
+}
+
+body.theme-light .mp-header-sticky tr:first-child th.mp-job-header--healer {
+  background: linear-gradient(to bottom, #c8e9d8, #f2f2f2);
+}
+
+body.theme-light .mp-header-sticky tr:first-child th.mp-job-header--dps {
+  background: linear-gradient(to bottom, #f5c2c2, #f2f2f2);
+}
+
+body.theme-light .mp-skill-header {
+  width: var(--mp-skill-col-w);
+  min-width: var(--mp-skill-col-w);
+  max-width: var(--mp-skill-col-w);
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body.theme-light .mp-skill-header--stack {
+  width: var(--mp-skill-col-stack-w);
+  min-width: var(--mp-skill-col-stack-w);
+  max-width: var(--mp-skill-col-stack-w);
+}
+
+body.theme-light .mp-skill-header-inner {
+  width: 100%;
+  padding: 0.1rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Skill column body cells */
+body.theme-light .mp-skill-cell {
+  width: var(--mp-skill-col-w);
+  min-width: var(--mp-skill-col-w);
+  max-width: var(--mp-skill-col-w);
+  padding-left: 0;
+  padding-right: 0;
+  box-sizing: border-box;
+}
+
+body.theme-light .mp-skill-cell--stack {
+  width: var(--mp-skill-col-stack-w);
+  min-width: var(--mp-skill-col-stack-w);
+  max-width: var(--mp-skill-col-stack-w);
+}
+
+/* Skill icon */
+body.theme-light .mp-skill-icon {
+  display: block;
+  width: 32px;  /* 42px から 32px に縮小 */
+  height: 32px;
+  max-width: 32px;
+  max-height: 32px;
+  margin: 0 auto;
+  border-radius: 0.3rem;
+  box-shadow: none;
+  object-fit: cover;
+}
+
+/* Fallback text label when no icon exists */
+body.theme-light .mp-skill-fallback {
+  display: block;
+  max-width: 2.4rem;
+  margin: 0 auto;
+  font-size: 0.65rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Job icon */
+body.theme-light .mp-job-icon {
+  display: block;
+  width: 38px;  /* 32px から 38px に拡大 */
+  height: 38px;
+  object-fit: contain;
+}
+
+/* Fallback text label when no icon exists */
+body.theme-light .mp-job-fallback {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* Job header content wrapper */
+body.theme-light .mp-job-header-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+/* Job expand/collapse button */
+body.theme-light .mp-job-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 0.25rem;
+  cursor: pointer;
+  color: #64748b;
+  font-size: 0.7rem;
+  transition: all 0.15s ease;
+}
+
+body.theme-light .mp-job-expand-btn:hover {
+  background: rgba(124, 58, 237, 0.15);
+  color: #7c3aed;
+}
+
+body.theme-light .mp-job-expand-icon {
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+body.theme-light .mp-job-expand-icon--expanded {
+  transform: rotate(90deg);
+}
+
+body.theme-light .mp-col-mechanism {
+  width: var(--mp-col-mech-w);
+  min-width: var(--mp-col-mech-w);
+  max-width: var(--mp-col-mech-w);
+  align-items: center;
+  justify-content: center;
+}
+
+/* Time column: Fixed width */
+body.theme-light .mp-col-time {
+  width: var(--mp-col-time-w);
+  min-width: var(--mp-col-time-w);
+  max-width: var(--mp-col-time-w);
+}
+
+/* Event column */
+body.theme-light .mp-col-event {
+  width: var(--mp-col-event-w);
+  min-width: var(--mp-col-event-w);
+  padding-right: 1rem;
+}
+
+body.theme-light .mp-col-element {
+  width: var(--mp-col-elem-w);
+  min-width: var(--mp-col-elem-w);
+  max-width: var(--mp-col-elem-w);
+}
+
+body.theme-light .mp-col-damage {
+  width: var(--mp-col-dmg-w);
+  min-width: var(--mp-col-dmg-w);
+  max-width: var(--mp-col-dmg-w);
+}
+
+body.theme-light .mp-element-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+body.theme-light .mp-element-icon-img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+body.theme-light .mp-element-empty {
+  display: inline-block;
+  width: 100%;
+  color: #475569;
+}
+
+body.theme-light .mp-damage-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+}
+
+body.theme-light .mp-damage-number {
+  font-variant-numeric: tabular-nums;
+}
+
+body.theme-light .mp-damage-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+body.theme-light .mp-dot-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  object-fit: contain;
+}
+
+body.theme-light .mp-damage-none {
+  color: #475569;
+}
+
+body.theme-light .mp-mechanism-cell {
+  position: absolute;
+  inset: 0;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0.25rem 0.5rem;
+  box-sizing: border-box;
+  gap: 0.25rem;
+  line-height: 1;
+}
+
+
+/* Base vertical bar: full cell height, centered, clickable */
+body.theme-light .mp-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 1.8px;   /* 10px から 2px に縮小してゲージを太くする */
+  right: 1.8px;  /* 10px から 2px に縮小してゲージを太くする */
+  border-width: 1px;
+  border-style: solid;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  padding: 0;
+  cursor: pointer;
+  background-clip: padding-box;
+}
+
+/* Shape rules: top/bottom joins between active cells */
+body.theme-light .cell-shape-none {
+  border-radius: 0;
+}
+body.theme-light .cell-shape-alone {
+  border-radius: 4px;
+}
+body.theme-light .cell-shape-start {
+  border-radius: 4px 4px 0 0;
+  border-bottom-width: 0;
+}
+body.theme-light .cell-shape-middle {
+  border-radius: 0;
+  border-top-width: 0;
+  border-bottom-width: 0;
+}
+body.theme-light .cell-shape-end {
+  border-radius: 0 0 4px 4px;
+  border-top-width: 0;
+}
+
+/* ========== Color system ========== */
+
+body.theme-light .cell-color-none {
+  background-color: transparent;
+  border-color: transparent;
+}
+body.theme-light .cell-color-green {
+  background-color: rgba(34, 197, 94, 0.18);
+  border-color: #16a34a;
+}
+body.theme-light .cell-color-red {
+  background-color: rgba(248, 113, 113, 0.20);
+  border-color: #f97373;
+}
+body.theme-light .cell-color-conflict {
+  background-color: rgba(250, 204, 21, 0.22);
+  border-color: #eab308;
+}
+
+body.theme-light .mp-bar-empty {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+/* ========== Validation Panel ========== */
+
+/* Container always reserves space */
+body.theme-light .validation-panel-container {
+  min-height: 44px;
+  margin-bottom: 12px;
+}
+
+body.theme-light .validation-panel {
+  border-radius: 8px;
+  overflow: hidden;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Empty state - subtle placeholder */
+body.theme-light .validation-panel--empty {
+  background: transparent;
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+}
+
+body.theme-light .validation-panel-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 14px;
+  color: rgba(100, 116, 139, 0.6);
+  font-size: 12px;
+}
+
+body.theme-light .validation-panel-empty-icon {
+  color: rgba(34, 197, 94, 0.6);
+  font-size: 13px;
+}
+
+body.theme-light .validation-panel-empty-text {
+  opacity: 0.8;
+}
+
+/* Active state - has issues */
+body.theme-light .validation-panel--active {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.12) 0%, rgba(245, 158, 11, 0.08) 100%);
+  border: 1px solid rgba(217, 119, 6, 0.5);
+}
+
+body.theme-light .validation-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #b45309;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+body.theme-light .validation-panel-header:hover {
+  background: rgba(217, 119, 6, 0.1);
+}
+
+body.theme-light .validation-panel-icon {
+  font-size: 14px;
+}
+
+body.theme-light .validation-panel-summary {
+  flex: 1;
+}
+
+body.theme-light .validation-panel-chevron {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+body.theme-light .validation-panel-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+body.theme-light .validation-panel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 14px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+body.theme-light .validation-issue {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+body.theme-light .validation-issue--error {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+body.theme-light .validation-issue--warning {
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+}
+
+body.theme-light .validation-issue--info {
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+}
+
+body.theme-light .validation-issue-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+body.theme-light .validation-issue-message {
+  flex: 1;
+}
+
+/* Stack cell (dropdown for stacking skills) */
+body.theme-light .mp-stack-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+}
+
+body.theme-light .mp-stack-select:focus {
+  outline: none;
+}
+
+body.theme-light .mp-stack-select option {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+/* Continuous bar border */
+body.theme-light .mp-bar.cell-color-green,
+body.theme-light .mp-bar.cell-color-red,
+body.theme-light .mp-bar.cell-color-conflict {
+  top: -1px;
+  bottom: -1px;
+  z-index: 1;
+}
+
+/* ========== Phase filter chips (ALL / P1 / P2) ========== */
+
+body.theme-light .phase-chip {
+  min-width: 2.75rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid #94a3b8;
+  background: #f2f2f2;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+body.theme-light .phase-chip:hover {
+  border-color: #38bdf8;
+  color: #0f172a;
+  background: #f2f2f2;
+}
+
+body.theme-light .phase-chip--active {
+  background: #e2e8f0;
+  color: #0f172a;
+  border-color: #7c3aed;
+  box-shadow:
+    0 0 0 1px rgba(124, 58, 237, 0.9),
+    0 0 10px rgba(129, 140, 248, 0.55);
+}
+
+/* ========== Scroll Bar ========== */
+body.theme-light .mp-wrapper::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+body.theme-light .mp-wrapper::-webkit-scrollbar-track {
+  background: #f2f2f2;
+}
+
+body.theme-light .mp-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  border: 2px solid #f2f2f2;
+}
+
+body.theme-light .mp-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #7c3aed;
+}
+
+body.theme-light .mp-wrapper::-webkit-scrollbar-corner {
+  background: #f2f2f2;
+}
+
+/* Firefox */
+body.theme-light .mp-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f2f2f2;
+}
