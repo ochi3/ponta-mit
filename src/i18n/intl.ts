@@ -2,8 +2,7 @@ export type IntlText = string;
 
 export function resolveIntlString(
   base: IntlText,
-  intl: any | undefined,
-  _locale: string
+  intl: Record<string, string> | undefined
 ): string {
   if (!intl) return base;
   return intl.ja ?? base;

@@ -126,7 +126,7 @@ export default function TopBar({
         }
     }
 
-    const timelineTitle = resolveIntlString(tl.title, undefined, "ja");
+    const timelineTitle = resolveIntlString(tl.title, undefined);
     const themeName = t(`topbar.theme.name.${theme}`);
     const themePlaceholder = "__THEME__";
     const plannerTitleTemplate = t("topbar.theme.title", { theme: themePlaceholder });
@@ -263,8 +263,7 @@ export default function TopBar({
                         <option value="__import__" disabled>
                             {resolveIntlString(
                                 importedTimelineState.title,
-                                undefined,
-                                "ja"
+                                undefined
                             )}{" "}
                             (imported)
                         </option>
@@ -272,7 +271,7 @@ export default function TopBar({
                     {BUILTIN_TIMELINE_ORDER.map((id) => {
                         const built = BUILTIN_TIMELINES[id];
                         const label = built
-                            ? resolveIntlString(built.title, undefined, "ja")
+                            ? resolveIntlString(built.title, undefined)
                             : id;
                         return (
                             <option key={id} value={id}>

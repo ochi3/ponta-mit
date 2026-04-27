@@ -150,7 +150,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
 
   useEffect(() => {
     setSeconds(secondsInPhase(tl, undefined));
-  }, [tl.id]);
+  }, [tl]);
 
   useEffect(() => {
     const body = document.body;

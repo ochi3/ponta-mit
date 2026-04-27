@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   formatClock,
   loadYouTubeIframeApi,
@@ -120,13 +120,13 @@ export default function PracticeModePanel({
     currentTimelineSec === null ? "--:--" : formatClock(currentTimelineSec);
   const videoClock = currentVideoSec === null ? "--:--" : formatClock(currentVideoSec);
 
-  function emitTimelineTime(value: number | null) {
+  const emitTimelineTime = useCallback((value: number | null) => {
     onTimelineTimeChangeRef.current(value);
-  }
+  }, []);
 
-  function emitVideoTime(value: number | null) {
+  const emitVideoTime = useCallback((value: number | null) => {
     onVideoTimeChangeRef.current(value);
-  }
+  }, []);
 
   function stopPlayerPoller() {
     if (playerPollerRef.current !== null) {
@@ -135,7 +135,7 @@ export default function PracticeModePanel({
     }
   }
 
-  function syncFromPlayer() {
+  const syncFromPlayer = useCallback(() => {
     const player = playerRef.current;
     if (!player) {
       setCurrentVideoSec(null);
@@ -177,7 +177,7 @@ export default function PracticeModePanel({
     setCurrentVideoSec(videoSec);
     emitVideoTime(videoSec);
     emitTimelineTime(Math.max(0, Math.floor(timelineSec)));
-  }
+  }, [emitTimelineTime, emitVideoTime]);
 
   useEffect(() => {
     if (!parsedVideo) {
@@ -272,11 +272,11 @@ export default function PracticeModePanel({
         hostElement.replaceChildren();
       }
     };
-  }, [parsedVideo?.startSeconds, parsedVideo?.videoId, practice.youtubeUrl]);
+  }, [parsedVideo, practice.youtubeUrl, syncFromPlayer, emitVideoTime, emitTimelineTime]);
 
   useEffect(() => {
     syncFromPlayer();
-  }, [effectiveSyncPoints]);
+  }, [effectiveSyncPoints, syncFromPlayer]);
 
   const panelClass = isLight
     ? "rounded-2xl border border-slate-200 bg-white/90 shadow-sm"
