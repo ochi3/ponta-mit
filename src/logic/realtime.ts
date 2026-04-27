@@ -17,6 +17,7 @@ export const REALTIME_EVENTS = {
   USAGE_UPDATED: "usage_updated",
   CLEAR_ALL: "clear_all",
   TEAM_UPDATED: "team_updated",
+  PRACTICE_UPDATED: "practice_updated",
   REQUEST_STATE: "request_state",
   SYNC_STATE: "sync_state",
 } as const;

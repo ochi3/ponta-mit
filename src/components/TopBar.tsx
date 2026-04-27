@@ -12,14 +12,31 @@ import { useI18n, resolveIntlString } from "../i18n";
 
 const BUILTIN_TIMELINE_ORDER = ["fru", "m12s-p1", "m12s-p2"] as const;
 
+function hasPracticeConfig(
+    practice?: { youtubeUrl?: string; syncPoints?: readonly unknown[] } | null
+) {
+    return Boolean(practice?.youtubeUrl?.trim() || practice?.syncPoints?.length);
+}
+
 type Props = {
     tl: Timeline;
     theme: ThemeMode;
+    isPracticeMode: boolean;
     onToggleTheme: () => void;
+    onTogglePracticeMode: () => void;
+    onOpenVideoSettings: () => void;
     onPhaseSeconds: (secs: number[], phaseId?: string) => void;
 };
 
-export default function TopBar({ tl, theme, onToggleTheme, onPhaseSeconds }: Props) {
+export default function TopBar({
+    tl,
+    theme,
+    isPracticeMode,
+    onToggleTheme,
+    onTogglePracticeMode,
+    onOpenVideoSettings,
+    onPhaseSeconds,
+}: Props) {
     const [shareUrl, setShareUrl] = useState("");
     const [isCopied, setIsCopied] = useState(false);
     const { t } = useI18n();
@@ -37,10 +54,18 @@ export default function TopBar({ tl, theme, onToggleTheme, onPhaseSeconds }: Pro
           ? timelineId
           : "fru";
     const expandedJobs = useStore((s) => s.expandedJobs);
+    const roomPractice = useStore((s) => s.plansByTimeline[tl.id]?.practice);
+    const contentPractice = useStore((s) => s.practiceDefaultsByTimeline[tl.id]);
     const setImportedTimeline = useStore((s) => s.setImportedTimeline);
     const setTimelineId = useStore((s) => s.setTimeline);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const isLight = theme === "light";
+
+    const practice = hasPracticeConfig(roomPractice)
+        ? roomPractice
+        : hasPracticeConfig(contentPractice)
+            ? contentPractice
+            : tl.practice;
 
     function handleGenerateLink() {
         const url = encodeShareUrl({
@@ -49,6 +74,12 @@ export default function TopBar({ tl, theme, onToggleTheme, onPhaseSeconds }: Pro
             usages,
             timelineId: timelineId || undefined,
             expandedJobs: expandedJobs.length ? expandedJobs : undefined,
+            practice: practice
+                ? {
+                    youtubeUrl: practice.youtubeUrl,
+                    syncPoints: practice.syncPoints,
+                  }
+                : undefined,
         });
         setShareUrl(url);
         setIsCopied(false);
@@ -111,6 +142,15 @@ export default function TopBar({ tl, theme, onToggleTheme, onPhaseSeconds }: Pro
         ? "px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 border border-emerald-200/80 text-slate-900 bg-white/70 hover:border-emerald-400 hover:bg-emerald-50"
         : "px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 border border-slate-600 text-slate-100 hover:border-emerald-500 hover:bg-slate-900";
 
+    const practiceButtonClass = isPracticeMode
+        ? isLight
+            ? "px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 border border-sky-500 text-sky-900 bg-sky-100"
+            : "px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 border border-sky-500 text-sky-100 bg-sky-500/15"
+        : actionButtonClass;
+    const youtubeButtonClass = isLight
+        ? "relative inline-flex h-8 w-8 items-center justify-center rounded-md border border-rose-200/90 bg-white/80 text-[11px] font-bold text-rose-700 transition-colors duration-150 hover:border-rose-400 hover:bg-rose-50"
+        : "relative inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-600 bg-slate-900/70 text-[11px] font-bold text-rose-200 transition-colors duration-150 hover:border-rose-400 hover:bg-slate-800";
+
     const inputClass = isLight
         ? "flex-1 rounded-md px-2 py-1 text-xs truncate transition-colors duration-150 bg-white/80 border border-indigo-100 text-slate-800 placeholder:text-slate-400"
         : "flex-1 rounded-md px-2 py-1 text-xs truncate transition-colors duration-150 bg-slate-900/70 border border-slate-700 text-slate-100";
@@ -120,6 +160,7 @@ export default function TopBar({ tl, theme, onToggleTheme, onPhaseSeconds }: Pro
         : "px-2 py-1 rounded-md border text-[11px] transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed border-slate-600 text-slate-100 hover:border-sky-500 hover:bg-slate-900";
 
     const labelTone = isLight ? "text-slate-600" : "text-slate-400";
+    const hasPracticeVideo = Boolean(practice?.youtubeUrl?.trim());
 
     return (
     <div className="flex flex-col gap-4 mt-2 mb-3">
@@ -153,6 +194,23 @@ export default function TopBar({ tl, theme, onToggleTheme, onPhaseSeconds }: Pro
 
                 <button type="button" onClick={handleGenerateLink} className={actionButtonClass}>
                     {t("topbar.actions.generateLink")}
+                </button>
+
+                <button type="button" onClick={onTogglePracticeMode} className={practiceButtonClass}>
+                    {isPracticeMode ? "動画モードを閉じる" : "動画モード"}
+                </button>
+
+                <button
+                    type="button"
+                    onClick={onOpenVideoSettings}
+                    className={youtubeButtonClass}
+                    title="YouTube設定"
+                    aria-label="YouTube設定"
+                >
+                    YT
+                    {hasPracticeVideo && (
+                        <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
+                    )}
                 </button>
 
                 <div className="flex items-center gap-1 min-w-48 max-w-[20rem]">

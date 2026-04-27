@@ -95,4 +95,19 @@ export function validateTimeline(tl: Timeline) {
   }
   validateMoments(tl.moments);
   validateMechanisms(tl);
+  if (tl.practice) {
+    if (typeof tl.practice.youtubeUrl !== "string") {
+      throw new Error(`Timeline "${tl.id}" practice.youtubeUrl must be a string`);
+    }
+    if (!Array.isArray(tl.practice.syncPoints)) {
+      throw new Error(`Timeline "${tl.id}" practice.syncPoints must be an array`);
+    }
+    for (const point of tl.practice.syncPoints) {
+      if (!Number.isInteger(point.t_sec) || !Number.isInteger(point.video_sec)) {
+        throw new Error(
+          `Timeline "${tl.id}" practice.syncPoints must use integer seconds`
+        );
+      }
+    }
+  }
 }

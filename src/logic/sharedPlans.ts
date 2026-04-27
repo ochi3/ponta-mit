@@ -1,6 +1,12 @@
 import { BUILTIN_TIMELINES } from "../data/timelines/registry";
 import { supabase } from "./realtime";
-import type { JobId, PlanUsage, SharePayload, Timeline } from "../types";
+import type {
+  JobId,
+  PlanUsage,
+  SharePayload,
+  Timeline,
+  TimelinePracticeConfig,
+} from "../types";
 
 const SHARED_PLANS_TABLE = "shared_plans";
 
@@ -10,6 +16,7 @@ type SharedPlanRow = {
   team: JobId[];
   usages: PlanUsage[];
   expanded_jobs: JobId[] | null;
+  practice: TimelinePracticeConfig | null;
   timeline: Timeline | null;
   updated_at: string | null;
 };
@@ -55,6 +62,7 @@ function toSharePayload(row: SharedPlanRow): SharePayload {
     usages: row.usages ?? [],
     timelineId: row.timeline_id,
     expandedJobs: row.expanded_jobs ?? undefined,
+    practice: row.practice ?? undefined,
   };
 }
 
@@ -66,7 +74,7 @@ export async function fetchSharedPlanSnapshot(
 
   const { data, error } = await supabase
     .from(SHARED_PLANS_TABLE)
-    .select("room_id, timeline_id, team, usages, expanded_jobs, timeline, updated_at")
+    .select("room_id, timeline_id, team, usages, expanded_jobs, practice, timeline, updated_at")
     .eq("room_id", roomId)
     .eq("timeline_id", timelineId)
     .maybeSingle();
@@ -113,6 +121,7 @@ export async function saveSharedPlanSnapshot(args: {
         team: payload.team,
         usages: payload.usages,
         expanded_jobs: payload.expandedJobs ?? [],
+        practice: payload.practice ?? { youtubeUrl: "", syncPoints: [] },
         timeline: timelineToPersist,
       },
       { onConflict: "room_id,timeline_id" }

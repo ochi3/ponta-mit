@@ -4,10 +4,14 @@ create table if not exists public.shared_plans (
   team jsonb not null default '[]'::jsonb,
   usages jsonb not null default '[]'::jsonb,
   expanded_jobs jsonb not null default '[]'::jsonb,
+  practice jsonb not null default '{}'::jsonb,
   timeline jsonb,
   updated_at timestamptz not null default timezone('utc', now()),
   primary key (room_id, timeline_id)
 );
+
+alter table public.shared_plans
+  add column if not exists practice jsonb not null default '{}'::jsonb;
 
 create index if not exists shared_plans_updated_at_idx
   on public.shared_plans (updated_at desc);

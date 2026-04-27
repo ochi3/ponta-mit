@@ -3,12 +3,22 @@ import { createJSONStorage, persist, type StateStorage } from "zustand/middlewar
 import { DEFAULT_TIMELINE_ID } from "../data/timelines/registry";
 import { normalizeTeam } from "../config/jobPriority";
 import { getRealtimeChannelName, getRoomId, REALTIME_EVENTS, supabase } from "../logic/realtime";
-import type { JobId, PlanUsage, SharePayload, Timeline } from "../types";
+import type {
+  JobId,
+  PlanUsage,
+  PracticeSettings,
+  SharePayload,
+  TimelinePracticeConfig,
+  Timeline,
+  VideoSyncPoint,
+} from "../types";
 
 type PlannerContentState = {
   team: JobId[];
   usages: PlanUsage[];
   expandedJobs: JobId[];
+  practice: PracticeSettings;
+  practiceSelectedJobId: JobId | null;
   needsRemoteSave: boolean;
   lastRemoteSavedAt: string | null;
 };
@@ -17,6 +27,7 @@ type PersistedStore = {
   timelineId?: string;
   importedTimeline?: Timeline | null;
   plansByTimeline?: Record<string, Partial<PlannerContentState>>;
+  practiceDefaultsByTimeline?: Record<string, TimelinePracticeConfig>;
   team?: JobId[];
   usages?: PlanUsage[];
   expandedJobs?: JobId[];
@@ -26,6 +37,7 @@ type Store = {
   timelineId: string;
   importedTimeline: Timeline | null;
   plansByTimeline: Record<string, PlannerContentState>;
+  practiceDefaultsByTimeline: Record<string, TimelinePracticeConfig>;
   team: JobId[];
   usages: PlanUsage[];
   expandedJobs: JobId[];
@@ -44,6 +56,10 @@ type Store = {
   clearUsages(): void;
 
   removeUsageForSkill(jobId: JobId, skillId: string): void;
+  setPracticeConfig(practice: TimelinePracticeConfig): void;
+  setPracticeYoutubeUrl(youtubeUrl: string): void;
+  replacePracticeSyncPoints(syncPoints: VideoSyncPoint[]): void;
+  setPracticeSelectedJob(jobId: JobId | null): void;
 
   applySharePayload(payload: SharePayload): void;
   applyPersistedSharedState(payload: SharePayload, updatedAt?: string | null): void;
@@ -77,16 +93,96 @@ function normalizeExpandedJobs(expandedJobs?: readonly JobId[]) {
   return expandedJobs ? Array.from(new Set(expandedJobs)) : [];
 }
 
+function normalizeSyncPoints(syncPoints?: readonly VideoSyncPoint[]) {
+  const byTimelineSecond = new Map<number, VideoSyncPoint>();
+
+  for (const point of syncPoints ?? []) {
+    if (!Number.isFinite(point.t_sec) || !Number.isFinite(point.video_sec)) {
+      continue;
+    }
+
+    const t_sec = Math.max(0, Math.floor(point.t_sec));
+    const video_sec = Math.max(0, Math.floor(point.video_sec));
+    byTimelineSecond.set(t_sec, { t_sec, video_sec });
+  }
+
+  return Array.from(byTimelineSecond.values()).sort(
+    (a, b) => a.t_sec - b.t_sec || a.video_sec - b.video_sec
+  );
+}
+
+function normalizePracticeSettings(
+  settings?: Partial<PracticeSettings> | null
+): PracticeSettings {
+  return {
+    youtubeUrl: settings?.youtubeUrl?.trim() ?? "",
+    syncPoints: normalizeSyncPoints(settings?.syncPoints),
+    selectedJobId:
+      typeof settings?.selectedJobId === "string" && settings.selectedJobId.trim()
+        ? settings.selectedJobId
+        : null,
+  };
+}
+
+function syncPracticeSelection(
+  team: readonly JobId[],
+  practice?: Partial<PracticeSettings> | null
+) {
+  const normalizedPractice = normalizePracticeSettings(practice);
+  if (normalizedPractice.selectedJobId && team.includes(normalizedPractice.selectedJobId)) {
+    return normalizedPractice;
+  }
+
+  return {
+    ...normalizedPractice,
+    selectedJobId: team[0] ?? null,
+  } satisfies PracticeSettings;
+}
+
+function toTimelinePracticeConfig(practice: PracticeSettings): TimelinePracticeConfig {
+  return {
+    youtubeUrl: practice.youtubeUrl,
+    syncPoints: practice.syncPoints,
+  };
+}
+
+function normalizeTimelinePracticeConfig(
+  practice?: Partial<TimelinePracticeConfig> | null
+): TimelinePracticeConfig {
+  return {
+    youtubeUrl: practice?.youtubeUrl?.trim() ?? "",
+    syncPoints: normalizeSyncPoints(practice?.syncPoints),
+  };
+}
+
+function hasTimelinePracticeConfig(
+  practice?: Partial<TimelinePracticeConfig> | null
+) {
+  return Boolean(practice?.youtubeUrl?.trim() || practice?.syncPoints?.length);
+}
+
 function normalizeContentState(
   state?: Partial<PlannerContentState> | null,
   base?: PlannerContentState
 ): PlannerContentState {
   const merged = { ...base, ...state };
+  const team = normalizeTeam(merged.team ?? []);
+  const practice = syncPracticeSelection(team, {
+    ...base?.practice,
+    ...state?.practice,
+    selectedJobId:
+      state?.practiceSelectedJobId ??
+      state?.practice?.selectedJobId ??
+      base?.practiceSelectedJobId ??
+      base?.practice.selectedJobId,
+  });
 
   return {
-    team: normalizeTeam(merged.team ?? []),
+    team,
     usages: sortUsages(merged.usages ?? []),
     expandedJobs: normalizeExpandedJobs(merged.expandedJobs),
+    practice,
+    practiceSelectedJobId: practice.selectedJobId,
     needsRemoteSave: merged.needsRemoteSave ?? false,
     lastRemoteSavedAt: merged.lastRemoteSavedAt ?? null,
   };
@@ -190,6 +286,15 @@ function mergePersistedState(
     migratedPlans[normalizeTimelineId(timelineId)] = normalizeContentState(contentState);
   }
 
+  const practiceDefaultsByTimeline = Object.fromEntries(
+    Object.entries(persistedState.practiceDefaultsByTimeline ?? {}).map(
+      ([timelineId, practice]) => [
+        normalizeTimelineId(timelineId),
+        normalizeTimelinePracticeConfig(practice),
+      ]
+    )
+  ) satisfies Record<string, TimelinePracticeConfig>;
+
   if (
     persistedState.team !== undefined ||
     persistedState.usages !== undefined ||
@@ -218,6 +323,7 @@ function mergePersistedState(
     ...currentState,
     timelineId,
     importedTimeline: persistedState.importedTimeline ?? currentState.importedTimeline,
+    practiceDefaultsByTimeline,
     plansByTimeline:
       timelineId in migratedPlans
         ? migratedPlans
@@ -236,6 +342,7 @@ export const useStore = create<Store>()(
     (set, get) => ({
       timelineId: DEFAULT_TIMELINE_ID,
       importedTimeline: null,
+      practiceDefaultsByTimeline: {},
       plansByTimeline: {
         [DEFAULT_TIMELINE_ID]: normalizeContentState(),
       },
@@ -259,6 +366,7 @@ export const useStore = create<Store>()(
           return updateTimelineState(state, timelineId, withRemoteSaveQueued({
             ...contentState,
             team: nextTeam,
+            practice: syncPracticeSelection(nextTeam, contentState.practice),
           }));
         }),
 
@@ -275,6 +383,7 @@ export const useStore = create<Store>()(
           return updateTimelineState(state, timelineId, withRemoteSaveQueued({
             ...contentState,
             team: nextTeam,
+            practice: syncPracticeSelection(nextTeam, contentState.practice),
           }));
         }),
 
@@ -287,6 +396,7 @@ export const useStore = create<Store>()(
           return updateTimelineState(state, timelineId, withRemoteSaveQueued({
             ...contentState,
             team: nextTeam,
+            practice: syncPracticeSelection(nextTeam, contentState.practice),
           }));
         }),
 
@@ -301,6 +411,7 @@ export const useStore = create<Store>()(
           return updateTimelineState(state, timelineId, withRemoteSaveQueued({
             ...contentState,
             team: nextTeam,
+            practice: syncPracticeSelection(nextTeam, contentState.practice),
           }));
         }),
 
@@ -411,10 +522,110 @@ export const useStore = create<Store>()(
           }));
         }),
 
+      setPracticeConfig: (practice) =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          const nextPractice = syncPracticeSelection(contentState.team, {
+            ...contentState.practice,
+            youtubeUrl: practice.youtubeUrl,
+            syncPoints: practice.syncPoints,
+            selectedJobId:
+              contentState.practiceSelectedJobId ??
+              contentState.practice.selectedJobId,
+          });
+          broadcast(
+            REALTIME_EVENTS.PRACTICE_UPDATED,
+            toTimelinePracticeConfig(nextPractice),
+            timelineId
+          );
+          return {
+            ...updateTimelineState(state, timelineId, withRemoteSaveQueued({
+              ...contentState,
+              practice: nextPractice,
+            })),
+            practiceDefaultsByTimeline: {
+              ...state.practiceDefaultsByTimeline,
+              [timelineId]: toTimelinePracticeConfig(nextPractice),
+            },
+          };
+        }),
+
+      setPracticeYoutubeUrl: (youtubeUrl) =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          const nextPractice = {
+            ...contentState.practice,
+            youtubeUrl,
+          };
+          broadcast(
+            REALTIME_EVENTS.PRACTICE_UPDATED,
+            toTimelinePracticeConfig(nextPractice),
+            timelineId
+          );
+          return {
+            ...updateTimelineState(state, timelineId, withRemoteSaveQueued({
+              ...contentState,
+              practice: nextPractice,
+            })),
+            practiceDefaultsByTimeline: {
+              ...state.practiceDefaultsByTimeline,
+              [timelineId]: toTimelinePracticeConfig(nextPractice),
+            },
+          };
+        }),
+
+      replacePracticeSyncPoints: (syncPoints) =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          const nextPractice = {
+            ...contentState.practice,
+            syncPoints: normalizeSyncPoints(syncPoints),
+          };
+          broadcast(
+            REALTIME_EVENTS.PRACTICE_UPDATED,
+            toTimelinePracticeConfig(nextPractice),
+            timelineId
+          );
+          return {
+            ...updateTimelineState(state, timelineId, withRemoteSaveQueued({
+              ...contentState,
+              practice: nextPractice,
+            })),
+            practiceDefaultsByTimeline: {
+              ...state.practiceDefaultsByTimeline,
+              [timelineId]: toTimelinePracticeConfig(nextPractice),
+            },
+          };
+        }),
+
+      setPracticeSelectedJob: (jobId) =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          return updateTimelineState(state, timelineId, {
+            ...contentState,
+            practice: syncPracticeSelection(contentState.team, {
+              ...contentState.practice,
+              selectedJobId: jobId,
+            }),
+            practiceSelectedJobId: jobId,
+          });
+        }),
+
       applySharePayload: (payload) => {
         const timelineId = normalizeTimelineId(payload.timelineId ?? get().timelineId);
         set((state) => ({
           importedTimeline: null,
+          practiceDefaultsByTimeline:
+            payload.practice !== undefined && hasTimelinePracticeConfig(payload.practice)
+              ? {
+                  ...state.practiceDefaultsByTimeline,
+                  [timelineId]: normalizeTimelinePracticeConfig(payload.practice),
+                }
+              : state.practiceDefaultsByTimeline,
           ...activateTimelineState(
             {
               ...state,
@@ -422,6 +633,13 @@ export const useStore = create<Store>()(
                 team: payload.team,
                 usages: payload.usages,
                 expandedJobs: payload.expandedJobs,
+                practice:
+                  payload.practice !== undefined
+                    ? {
+                        ...state.plansByTimeline[timelineId]?.practice,
+                        ...payload.practice,
+                      }
+                    : state.plansByTimeline[timelineId]?.practice,
                 needsRemoteSave: false,
               }),
             },
@@ -433,6 +651,13 @@ export const useStore = create<Store>()(
       applyPersistedSharedState: (payload, updatedAt) => {
         const timelineId = normalizeTimelineId(payload.timelineId ?? get().timelineId);
         set((state) => ({
+          practiceDefaultsByTimeline:
+            payload.practice !== undefined && hasTimelinePracticeConfig(payload.practice)
+              ? {
+                  ...state.practiceDefaultsByTimeline,
+                  [timelineId]: normalizeTimelinePracticeConfig(payload.practice),
+                }
+              : state.practiceDefaultsByTimeline,
           ...activateTimelineState(
             {
               ...state,
@@ -440,6 +665,13 @@ export const useStore = create<Store>()(
                 team: payload.team,
                 usages: payload.usages,
                 expandedJobs: payload.expandedJobs,
+                practice:
+                  payload.practice !== undefined
+                    ? {
+                        ...state.plansByTimeline[timelineId]?.practice,
+                        ...payload.practice,
+                      }
+                    : state.plansByTimeline[timelineId]?.practice,
                 needsRemoteSave: false,
                 lastRemoteSavedAt: updatedAt ?? null,
               }),
@@ -470,12 +702,30 @@ export const useStore = create<Store>()(
 
           if (event === REALTIME_EVENTS.SYNC_STATE) {
             const syncedPayload = payload as Partial<PlannerContentState>;
-            return updateTimelineState(state, resolvedTimelineId, withRemoteSaveQueued({
-              ...contentState,
-              team: syncedPayload.team ?? contentState.team,
-              usages: syncedPayload.usages ?? contentState.usages,
-              expandedJobs: syncedPayload.expandedJobs ?? contentState.expandedJobs,
-            }));
+            return {
+              ...updateTimelineState(state, resolvedTimelineId, withRemoteSaveQueued({
+                ...contentState,
+                team: syncedPayload.team ?? contentState.team,
+                usages: syncedPayload.usages ?? contentState.usages,
+                expandedJobs: syncedPayload.expandedJobs ?? contentState.expandedJobs,
+                practice:
+                  syncedPayload.practice !== undefined
+                    ? {
+                        ...contentState.practice,
+                        ...syncedPayload.practice,
+                      }
+                    : contentState.practice,
+              })),
+              practiceDefaultsByTimeline:
+                syncedPayload.practice !== undefined && hasTimelinePracticeConfig(syncedPayload.practice)
+                  ? {
+                      ...state.practiceDefaultsByTimeline,
+                      [resolvedTimelineId]: normalizeTimelinePracticeConfig(
+                        syncedPayload.practice
+                      ),
+                    }
+                  : state.practiceDefaultsByTimeline,
+            };
           }
 
           if (event === REALTIME_EVENTS.TEAM_UPDATED) {
@@ -483,6 +733,27 @@ export const useStore = create<Store>()(
               ...contentState,
               team: payload as JobId[],
             }));
+          }
+
+          if (event === REALTIME_EVENTS.PRACTICE_UPDATED) {
+            const nextPracticePayload = payload as TimelinePracticeConfig;
+            return {
+              ...updateTimelineState(state, resolvedTimelineId, withRemoteSaveQueued({
+                ...contentState,
+                practice: {
+                  ...contentState.practice,
+                  ...nextPracticePayload,
+                },
+              })),
+              practiceDefaultsByTimeline: hasTimelinePracticeConfig(nextPracticePayload)
+                ? {
+                    ...state.practiceDefaultsByTimeline,
+                    [resolvedTimelineId]: normalizeTimelinePracticeConfig(
+                      nextPracticePayload
+                    ),
+                  }
+                : state.practiceDefaultsByTimeline,
+            };
           }
 
           if (
@@ -548,6 +819,7 @@ export const useStore = create<Store>()(
             team: contentState.team,
             usages: contentState.usages,
             expandedJobs: contentState.expandedJobs,
+            practice: toTimelinePracticeConfig(contentState.practice),
           },
           resolvedTimelineId
         );
@@ -561,6 +833,7 @@ export const useStore = create<Store>()(
       partialize: (state) => ({
         timelineId: state.timelineId,
         importedTimeline: state.importedTimeline ?? undefined,
+        practiceDefaultsByTimeline: state.practiceDefaultsByTimeline,
         plansByTimeline: state.plansByTimeline,
       }),
       merge: (persistedState, currentState) =>

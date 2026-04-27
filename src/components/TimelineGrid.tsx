@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { CSSProperties, JSX } from "react";
 import { useStore } from "../state/store";
 import { JOBS } from "../data/jobs/jobs.registry";
@@ -150,16 +150,37 @@ function freezeStyle(left: string): CSSProperties {
 export default function TimelineGrid({
   tl,
   seconds,
+  jobFilter,
+  focusJobId,
+  focusSecond,
+  followTime = false,
+  onTimeClick,
+  syncSeconds,
 }: {
   tl: Timeline;
   seconds: number[];
+  jobFilter?: JobId | null;
+  focusJobId?: JobId | null;
+  focusSecond?: number | null;
+  followTime?: boolean;
+  onTimeClick?: (sec: number) => void;
+  syncSeconds?: readonly number[];
 }) {
   const { t } = useI18n();
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const team = useStore((s) => s.team);
   const usages = useStore((s) => s.usages);
   const expandedJobs = useStore((s) => s.expandedJobs);
   const toggleJobExpand = useStore((s) => s.toggleJobExpand);
   const hasMechanisms = Boolean(tl.mechanisms?.length);
+  const syncSecondsSet = useMemo(
+    () => new Set(syncSeconds ?? []),
+    [syncSeconds]
+  );
+  const visibleTeam = useMemo(
+    () => (jobFilter ? team.filter((jobId) => jobId === jobFilter) : team),
+    [jobFilter, team]
+  );
 
   // Pre-build usage index for O(1) lookup in render
   const usageIndex = useMemo(() => {
@@ -172,7 +193,7 @@ export default function TimelineGrid({
 
   const cols: Col[] = useMemo(() => {
     const out: Col[] = [];
-    for (const jobId of team) {
+    for (const jobId of visibleTeam) {
       const jobName = JOBS.find((j) => j.id === jobId)?.name ?? jobId;
       const isExpanded = expandedJobs.includes(jobId);
       const skillIds = getJobSkillIds(jobId, isExpanded);
@@ -182,7 +203,7 @@ export default function TimelineGrid({
       }
     }
     return out;
-  }, [team, expandedJobs]);
+  }, [visibleTeam, expandedJobs]);
 
   const jobColspan = useMemo(() => {
     const m = new Map<JobId, number>();
@@ -250,6 +271,56 @@ export default function TimelineGrid({
     () => buildMechanismRuns(hasMechanisms, mechanismNames, secondLines),
     [hasMechanisms, mechanismNames, secondLines]
   );
+
+  useEffect(() => {
+    if (!followTime || focusSecond === null || focusSecond === undefined) {
+      return;
+    }
+
+    const wrapper = wrapperRef.current;
+    if (!wrapper) {
+      return;
+    }
+
+    const targetRow = wrapper.querySelector<HTMLTableRowElement>(
+      `tr[data-row-sec="${focusSecond}"]`
+    );
+    if (!targetRow) {
+      return;
+    }
+
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const rowRect = targetRow.getBoundingClientRect();
+    const topThreshold = wrapperRect.top + wrapperRect.height * 0.25;
+    const bottomThreshold = wrapperRect.bottom - wrapperRect.height * 0.25;
+
+    if (rowRect.top < topThreshold || rowRect.bottom > bottomThreshold) {
+      targetRow.scrollIntoView({ block: "center" });
+    }
+  }, [followTime, focusSecond]);
+
+  useEffect(() => {
+    if (!focusJobId) {
+      return;
+    }
+
+    const wrapper = wrapperRef.current;
+    if (!wrapper) {
+      return;
+    }
+
+    const targetHeader = wrapper.querySelector<HTMLElement>(
+      `th[data-job-id="${focusJobId}"]`
+    );
+    if (!targetHeader) {
+      return;
+    }
+
+    targetHeader.scrollIntoView({
+      inline: "center",
+      block: "nearest",
+    });
+  }, [focusJobId]);
 
   const gridVisual: CellVisualState[][] = useMemo(() => {
     // 第一维：列；第二维：绝对行 rowIndex（0..rows.length-1）
@@ -569,7 +640,7 @@ export default function TimelineGrid({
   return (
     <div className="w-full">
       <div className="w-full px-2 mp-shell">
-        <div className="rounded mp-wrapper">
+        <div ref={wrapperRef} className="rounded mp-wrapper">
           <table className="mp-table text-sm border-collapse">
             <thead className="mp-header-sticky">
               <tr>
@@ -628,6 +699,7 @@ export default function TimelineGrid({
                   return (
                     <th
                       key={jobId}
+                      data-job-id={jobId}
                       className={`p-2 text-center border-l mp-job-header ${roleClass}`}
                       colSpan={span}
                       style={{
@@ -705,8 +777,14 @@ export default function TimelineGrid({
                 const mechanismLabel = mechanismCell?.label ?? "";
                 const moment = row.line.moment;
 
-                return (
-                  <tr key={`${row.sec}::${row.lineIndex}`} className="mp-row align-top">
+              return (
+                  <tr
+                    key={`${row.sec}::${row.lineIndex}`}
+                    data-row-sec={row.sec}
+                    className={`mp-row align-top ${
+                      focusSecond === row.sec ? "mp-row--focus" : ""
+                    }`}
+                  >
                     {hasMechanisms && mechanismCell && (
                       <td
                         className="p-1 text-center whitespace-nowrap mp-col-mechanism mp-col-freeze mp-col-freeze--first"
@@ -722,7 +800,36 @@ export default function TimelineGrid({
                         hasMechanisms ? "mp-col-freeze--middle" : "mp-col-freeze--first"
                       }`}
                       style={freezeStyle(freezeOffsets.time)}>
-                      {row.line.showTime ? formatSec(row.sec) : ""}
+                      {row.line.showTime ? (
+                        onTimeClick ? (
+                          <button
+                            type="button"
+                            onClick={() => onTimeClick(row.sec)}
+                            className="flex w-full items-center gap-1 text-left hover:text-sky-400"
+                            title="同期ポイントを設定"
+                          >
+                            <span>{formatSec(row.sec)}</span>
+                            {syncSecondsSet.has(row.sec) && (
+                              <span
+                                className="inline-block h-2 w-2 rounded-full bg-sky-400"
+                                aria-label="sync point"
+                              />
+                            )}
+                          </button>
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <span>{formatSec(row.sec)}</span>
+                            {syncSecondsSet.has(row.sec) && (
+                              <span
+                                className="inline-block h-2 w-2 rounded-full bg-sky-400"
+                                aria-label="sync point"
+                              />
+                            )}
+                          </span>
+                        )
+                      ) : (
+                        ""
+                      )}
                     </td>
                     <td
                       className="p-1 mp-col-event mp-col-freeze mp-col-freeze--middle"

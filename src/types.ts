@@ -40,12 +40,29 @@ export interface Timeline {
   phases: Phase[];
   moments: Moment[];
   mechanisms?: MechanismSlice[];
+  practice?: TimelinePracticeConfig;
 }
 
 export type RoleId = "tank" | "healer" | "melee" | "ranged" | "caster";
 export type JobId = string;
 export type SkillId = string;
 export type ThemeMode = "dark" | "light";
+
+export interface VideoSyncPoint {
+  t_sec: number;
+  video_sec: number;
+}
+
+export interface TimelinePracticeConfig {
+  youtubeUrl: string;
+  syncPoints: VideoSyncPoint[];
+}
+
+export interface PracticeSettings {
+  youtubeUrl: string;
+  syncPoints: VideoSyncPoint[];
+  selectedJobId: JobId | null;
+}
 
 export type IconRef = string;
 
@@ -116,6 +133,7 @@ export interface SharePayload {
   expandedJobs?: JobId[];
 
   timelineId?: string;
+  practice?: TimelinePracticeConfig;
 
   timelineInline?: {
     version: number;

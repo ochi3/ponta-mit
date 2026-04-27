@@ -1,6 +1,12 @@
 import pako from "pako";
 import { ensureRoomId } from "./realtime";
-import type { JobId, PlanUsage, SharePayload } from "../types";
+import type {
+  JobId,
+  PlanUsage,
+  SharePayload,
+  TimelinePracticeConfig,
+  VideoSyncPoint,
+} from "../types";
 
 const SHARE_QUERY_KEY = "plan";
 
@@ -45,6 +51,22 @@ function isTimelineInline(
   );
 }
 
+function isVideoSyncPoint(x: unknown): x is VideoSyncPoint {
+  if (!x || typeof x !== "object") return false;
+  const point = x as Record<string, unknown>;
+  return typeof point.t_sec === "number" && typeof point.video_sec === "number";
+}
+
+function isPracticeConfig(x: unknown): x is TimelinePracticeConfig {
+  if (!x || typeof x !== "object") return false;
+  const practice = x as Record<string, unknown>;
+  return (
+    typeof practice.youtubeUrl === "string" &&
+    Array.isArray(practice.syncPoints) &&
+    practice.syncPoints.every(isVideoSyncPoint)
+  );
+}
+
 function normalizeParsedPayload(raw: unknown): SharePayload | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -70,6 +92,11 @@ function normalizeParsedPayload(raw: unknown): SharePayload | null {
     timelineId: typeof o.timelineId === "string" ? o.timelineId : undefined,
     expandedJobs,
   };
+
+  if (o.practice !== undefined) {
+    if (!isPracticeConfig(o.practice)) return null;
+    out.practice = o.practice;
+  }
 
   if (o.timelineInline !== undefined) {
     if (!isTimelineInline(o.timelineInline)) return null;
