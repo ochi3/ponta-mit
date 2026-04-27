@@ -68,6 +68,7 @@ type Store = {
 
   requestState(timelineId?: string): void;
   broadcastCurrentState(timelineId?: string): void;
+  resetTimelineState(timelineId: string): void;
 };
 
 type TimelineScopedStoreState = Pick<
@@ -703,7 +704,7 @@ export const useStore = create<Store>()(
           if (event === REALTIME_EVENTS.SYNC_STATE) {
             const syncedPayload = payload as Partial<PlannerContentState>;
             return {
-              ...updateTimelineState(state, resolvedTimelineId, withRemoteSaveQueued({
+              ...updateTimelineState(state, resolvedTimelineId, {
                 ...contentState,
                 team: syncedPayload.team ?? contentState.team,
                 usages: syncedPayload.usages ?? contentState.usages,
@@ -715,7 +716,8 @@ export const useStore = create<Store>()(
                         ...syncedPayload.practice,
                       }
                     : contentState.practice,
-              })),
+                needsRemoteSave: false,
+              }),
               practiceDefaultsByTimeline:
                 syncedPayload.practice !== undefined && hasTimelinePracticeConfig(syncedPayload.practice)
                   ? {
@@ -824,6 +826,12 @@ export const useStore = create<Store>()(
           resolvedTimelineId
         );
       },
+
+      resetTimelineState: (timelineId) =>
+        set((state) => {
+          const resolvedTimelineId = normalizeTimelineId(timelineId);
+          return updateTimelineState(state, resolvedTimelineId, normalizeContentState());
+        }),
     }),
     {
       name: "mp-planner-state",

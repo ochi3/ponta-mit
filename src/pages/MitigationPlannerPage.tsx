@@ -124,6 +124,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   const setImportedTimeline = useStore((s) => s.setImportedTimeline);
   const setPracticeConfig = useStore((s) => s.setPracticeConfig);
   const setPracticeSelectedJob = useStore((s) => s.setPracticeSelectedJob);
+  const resetTimelineState = useStore((s) => s.resetTimelineState);
   const applySharePayload = useStore((s) => s.applySharePayload);
   const applyPersistedSharedState = useStore((s) => s.applyPersistedSharedState);
   const applyExternalUsage = useStore((s) => s.applyExternalUsage);
@@ -147,6 +148,8 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
         : practiceConfig.syncPoints.find((point) => point.t_sec === editingSyncSecond) ?? null,
     [editingSyncSecond, practiceConfig.syncPoints]
   );
+
+  const currentRoomId = useMemo(() => getRoomId(), [typeof window !== "undefined" ? window.location.search : ""]);
 
   useEffect(() => {
     setSeconds(secondsInPhase(tl, undefined));
@@ -172,6 +175,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   }, [setTimeline, tl.id]);
 
   useEffect(() => {
+    resetTimelineState(tl.id);
     setPracticeTimelineSec(null);
     setPracticeVideoSec(null);
     setPracticeVideoPaneWidth(null);
@@ -179,7 +183,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     setPracticeJobDialogMode(null);
     setPracticeExtraJobIds([]);
     setIsVideoSettingsOpen(false);
-  }, [tl.id]);
+  }, [tl.id, currentRoomId, resetTimelineState]);
 
   useEffect(() => {
     if (!isPracticeMode) {
@@ -343,7 +347,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     return () => {
       cancelled = true;
     };
-  }, [applyPersistedSharedState, setImportedTimeline, tl.id]);
+  }, [applyPersistedSharedState, setImportedTimeline, tl.id, currentRoomId]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -368,7 +372,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     return () => {
       channel.unsubscribe();
     };
-  }, [applyExternalUsage, tl.id]);
+  }, [applyExternalUsage, tl.id, currentRoomId]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -415,6 +419,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     team,
     tl.id,
     usages,
+    currentRoomId,
   ]);
 
   useEffect(() => {
