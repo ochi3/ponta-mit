@@ -322,18 +322,8 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
 
     async function loadSharedPlan() {
       try {
-        const localContentState = useStore.getState().plansByTimeline[tl.id];
-        if (localContentState?.needsRemoteSave) {
-          return;
-        }
-
         const snapshot = await fetchSharedPlanSnapshot(getRoomId(), tl.id);
         if (cancelled || !snapshot) {
-          return;
-        }
-
-        const latestLocalState = useStore.getState().plansByTimeline[tl.id];
-        if (latestLocalState?.needsRemoteSave) {
           return;
         }
 
