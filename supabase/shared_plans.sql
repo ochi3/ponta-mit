@@ -19,6 +19,7 @@ create index if not exists shared_plans_updated_at_idx
 create or replace function public.set_shared_plans_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = timezone('utc', now());

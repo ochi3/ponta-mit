@@ -123,13 +123,13 @@ export async function saveSharedPlanSnapshot(args: {
         expanded_jobs: payload.expandedJobs ?? [],
         practice: payload.practice ?? { youtubeUrl: "", syncPoints: [] },
         timeline: timelineToPersist,
-      },
-      { onConflict: "room_id,timeline_id" }
+      }
     )
     .select("updated_at")
     .single();
 
   if (error) {
+    console.error("Supabase upsert error:", error);
     throw toSharedPlansError(error);
   }
 
