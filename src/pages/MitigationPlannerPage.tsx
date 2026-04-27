@@ -102,6 +102,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   const [practiceJobDialogMode, setPracticeJobDialogMode] =
     useState<PracticeJobDialogMode>(null);
   const [isVideoSettingsOpen, setIsVideoSettingsOpen] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [practiceTimelineSec, setPracticeTimelineSec] = useState<number | null>(null);
   const [practiceVideoSec, setPracticeVideoSec] = useState<number | null>(null);
   const [practiceVideoPaneWidth, setPracticeVideoPaneWidth] = useState<number | null>(null);
@@ -132,6 +133,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   const shareFromUrlApplied = useRef(false);
   const practiceLayoutRef = useRef<HTMLDivElement | null>(null);
   const practiceTimelinePaneRef = useRef<HTMLDivElement | null>(null);
+  const prevRoomIdRef = useRef<string>(getRoomId());
   const practiceConfig = useMemo(
     () => resolvePracticeConfig(roomPractice, contentPractice, tl.practice),
     [contentPractice, roomPractice, tl.practice]
@@ -175,7 +177,12 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   }, [setTimeline, tl.id]);
 
   useEffect(() => {
-    resetTimelineState(tl.id);
+    if (prevRoomIdRef.current !== currentRoomId) {
+      resetTimelineState(tl.id);
+    }
+    prevRoomIdRef.current = currentRoomId;
+
+    setIsLoaded(false);
     setPracticeTimelineSec(null);
     setPracticeVideoSec(null);
     setPracticeVideoPaneWidth(null);
@@ -339,13 +346,25 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
         applyPersistedSharedState(snapshot.payload, snapshot.updatedAt);
       } catch (error) {
         console.error("Failed to load shared plan snapshot", error);
+      } finally {
+        setIsLoaded(true);
       }
     }
 
-    void loadSharedPlan();
+    const loadTimer = window.setTimeout(() => {
+      if (!isLoaded) {
+        console.warn("[Storage] Load timed out, enabling save anyway.");
+        setIsLoaded(true);
+      }
+    }, 5000);
+
+    void loadSharedPlan().finally(() => {
+      window.clearTimeout(loadTimer);
+    });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(loadTimer);
     };
   }, [applyPersistedSharedState, setImportedTimeline, tl.id, currentRoomId]);
 
@@ -376,15 +395,16 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
 
   useEffect(() => {
     if (!supabase) return;
-    if (!needsRemoteSave) return;
+    if (!needsRemoteSave || !isLoaded) return;
     if (typeof window !== "undefined" && !window.navigator.onLine) return;
 
     let cancelled = false;
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
+          console.info(`[Storage] Saving plan for room: ${currentRoomId}, timeline: ${tl.id}...`);
           const updatedAt = await saveSharedPlanSnapshot({
-            roomId: getRoomId(),
+            roomId: currentRoomId,
             timelineId: tl.id,
             payload: {
               v: 1,
@@ -398,13 +418,14 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
           });
 
           if (!cancelled) {
+            console.info(`[Storage] Save successful at ${updatedAt}`);
             markTimelineSaved(tl.id, updatedAt);
           }
         } catch (error) {
-          console.error("Failed to save shared plan snapshot", error);
+          console.error("[Storage] Failed to save shared plan snapshot", error);
         }
       })();
-    }, 350);
+    }, 1000); // 頻繁な保存を避けるため1秒に延長
 
     return () => {
       cancelled = true;
@@ -420,6 +441,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     tl.id,
     usages,
     currentRoomId,
+    isLoaded,
   ]);
 
   useEffect(() => {
