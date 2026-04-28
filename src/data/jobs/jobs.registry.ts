@@ -2,15 +2,15 @@ import type { Job } from "../../types";
 
 const JOB_ENTRIES = [
   // Tanks
+  { id: "tank.drk", name: "暗黒騎士", role: "tank" },
   { id: "tank.pld", name: "ナイト", role: "tank" },
   { id: "tank.war", name: "戦士", role: "tank" },
-  { id: "tank.drk", name: "暗黒騎士", role: "tank" },
   { id: "tank.gnb", name: "ガンブレイカー", role: "tank" },
 
   // Healers
   { id: "healer.whm", name: "白魔道士", role: "healer" },
-  { id: "healer.sch", name: "学者", role: "healer" },
   { id: "healer.ast", name: "占星術師", role: "healer" },
+  { id: "healer.sch", name: "学者", role: "healer" },
   { id: "healer.sge", name: "賢者", role: "healer" },
 
   // Melee DPS

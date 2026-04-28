@@ -23,6 +23,7 @@ import TimelineGrid from "../components/TimelineGrid";
 import ValidationPanel from "../components/ValidationPanel";
 import PracticeModePanel from "../components/PracticeModePanel";
 import PracticeIconModePanel from "../components/PracticeIconModePanel";
+import SkillIconPanel from "../components/SkillIconPanel";
 import PracticeJobSelectDialog from "../components/PracticeJobSelectDialog";
 import TimelineVideoSettingsDialog from "../components/TimelineVideoSettingsDialog";
 import TimelineSyncPointDialog from "../components/TimelineSyncPointDialog";
@@ -621,6 +622,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
                 theme={theme}
                 practice={practiceConfig}
                 currentTimelineSec={practiceTimelineSec}
+                primaryJobId={practiceSelectedJobId}
                 viewMode={practiceViewMode}
                 onClose={closePracticeMode}
                 onViewModeChange={setPracticeViewMode}

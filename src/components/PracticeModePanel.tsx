@@ -9,7 +9,14 @@ import type {
   ThemeMode,
   TimelinePracticeConfig,
   VideoSyncPoint,
+  JobId,
 } from "../types";
+import { useStore } from "../state/store";
+import {
+  getPracticeSkillSnapshot,
+  getPracticeSkillsForJob,
+} from "../logic/practiceIconMode";
+import { getSkillIcon } from "../data/skills/icon.skills";
 
 type PracticeViewMode = "timeline" | "icons";
 
@@ -17,6 +24,7 @@ type Props = {
   theme: ThemeMode;
   practice: TimelinePracticeConfig;
   currentTimelineSec: number | null;
+  primaryJobId: JobId | null;
   viewMode: PracticeViewMode;
   onClose: () => void;
   onViewModeChange: (mode: PracticeViewMode) => void;
@@ -88,6 +96,7 @@ export default function PracticeModePanel({
   theme,
   practice,
   currentTimelineSec,
+  primaryJobId,
   viewMode,
   onClose,
   onViewModeChange,
@@ -95,6 +104,15 @@ export default function PracticeModePanel({
   onVideoTimeChange,
 }: Props) {
   const isLight = theme === "light";
+  const usages = useStore((state) => state.usages);
+  const expandedJobs = useStore((state) => state.expandedJobs);
+  
+  const skillSnapshots = useMemo(() => {
+    if (!primaryJobId || currentTimelineSec === null) return [];
+    return getPracticeSkillsForJob(primaryJobId, usages, expandedJobs).map((skill) =>
+      getPracticeSkillSnapshot(primaryJobId, skill, usages, currentTimelineSec)
+    );
+  }, [primaryJobId, currentTimelineSec, usages, expandedJobs]);
   const parsedVideo = useMemo(
     () => parseYouTubeUrl(practice.youtubeUrl),
     [practice.youtubeUrl]
@@ -328,7 +346,7 @@ export default function PracticeModePanel({
       </div>
 
       <div className="mt-4 grid gap-4">
-        <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-slate-800/70 bg-slate-900/50 px-4 py-3">
+        <div className="flex flex-wrap items-end justify-between gap-4 rounded-xl border border-slate-800/70 bg-slate-900/50 px-4 py-3">
           <div className="flex items-end gap-3">
             <div className="text-xs text-slate-400">
               現在位置
@@ -337,7 +355,57 @@ export default function PracticeModePanel({
               {timelineClock}
             </div>
           </div>
-          <div className={`text-xs ${subtleTextClass}`}>
+          
+          {skillSnapshots.length > 0 && (
+            <div className="flex items-center gap-2">
+              {skillSnapshots.map((snapshot) => {
+                const { skill, status, remainingSec } = snapshot;
+                const skillIcon = getSkillIcon(skill.id);
+                const timerLabel = remainingSec === null ? null : String(remainingSec);
+                const bgClass = status === "cooldown"
+                  ? "opacity-50"
+                  : status === "active"
+                    ? "ring-2 ring-sky-500"
+                    : "";
+                return (
+                  <div
+                    key={`${primaryJobId}-${skill.id}`}
+                    className="relative"
+                    title={skill.name}
+                  >
+                    <img
+                      src={skillIcon}
+                      alt={skill.name}
+                      className={`size-8 rounded transition-all ${bgClass}`}
+                      loading="lazy"
+                    />
+                    {timerLabel && (
+                      <div 
+                        className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white pointer-events-none" 
+                        style={{ 
+                          textShadow: `
+                            -1px -1px 0 rgba(0,0,0,0.8),
+                            1px -1px 0 rgba(0,0,0,0.8),
+                            -1px 1px 0 rgba(0,0,0,0.8),
+                            1px 1px 0 rgba(0,0,0,0.8),
+                            0 -1px 0 rgba(0,0,0,0.8),
+                            0 1px 0 rgba(0,0,0,0.8),
+                            -1px 0 0 rgba(0,0,0,0.8),
+                            1px 0 0 rgba(0,0,0,0.8),
+                            0 0 4px rgba(0,0,0,0.95)
+                          `
+                        }}
+                      >
+                        {timerLabel}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
+          <div className={`text-xs ${subtleTextClass} min-w-[7rem]`}>
             動画 {videoClock} ・ {PLAYER_STATE_LABELS[playerState]}
           </div>
         </div>

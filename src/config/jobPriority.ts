@@ -1,8 +1,8 @@
 import type { JobId } from "../types";
 
 export const DEFAULT_JOB_PRIORITY: readonly JobId[] = [
-  "tank.pld","tank.war","tank.drk","tank.gnb",
-  "healer.whm","healer.sch","healer.ast","healer.sge",
+  "tank.drk","tank.pld","tank.war","tank.gnb",
+  "healer.whm","healer.ast","healer.sch","healer.sge",
   "melee.mnk","melee.drg","melee.nin","melee.sam","melee.rpr","melee.vpr",
   "ranged.brd","ranged.mch","ranged.dnc",
   "caster.blm","caster.smn","caster.rdm","caster.pct",
