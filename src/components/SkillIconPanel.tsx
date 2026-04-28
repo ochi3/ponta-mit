@@ -8,7 +8,7 @@ import {
   getPracticeSkillsForJob,
 } from "../logic/practiceIconMode";
 import { useStore } from "../state/store";
-import type { JobId, PlanUsage, ThemeMode } from "../types";
+import type { JobId, ThemeMode } from "../types";
 
 type Props = {
   theme: ThemeMode;
@@ -141,39 +141,31 @@ export default function SkillIconPanel({
             </div>
             <div className="grid grid-cols-4 gap-2">
               {snapshots.map((snapshot) => {
-                const { skill, isDone, isActive, isQueued } = snapshot;
+                const { skill, status } = snapshot;
                 const skillIcon = getSkillIcon(skill.id);
                 const label = fallbackSkillLabel(skill.name);
-                const bgClass = isDone
+                const bgClass = status === "cooldown"
                   ? isLight
                     ? "bg-slate-200"
                     : "bg-slate-700"
-                  : isActive
+                  : status === "active"
                     ? isLight
                       ? "bg-sky-200"
                       : "bg-sky-500/30"
-                    : isQueued
-                      ? isLight
-                        ? "bg-amber-100"
-                        : "bg-amber-500/20"
-                      : isLight
-                        ? "bg-slate-100"
-                        : "bg-slate-800";
-                const textClass = isDone
+                    : isLight
+                      ? "bg-slate-100"
+                      : "bg-slate-800";
+                const textClass = status === "cooldown"
                   ? isLight
                     ? "text-slate-600"
                     : "text-slate-300"
-                  : isActive
+                  : status === "active"
                     ? isLight
                       ? "text-sky-900"
                       : "text-sky-100"
-                    : isQueued
-                      ? isLight
-                        ? "text-amber-900"
-                        : "text-amber-100"
-                      : isLight
-                        ? "text-slate-700"
-                        : "text-slate-200";
+                    : isLight
+                      ? "text-slate-700"
+                      : "text-slate-200";
 
                 return (
                   <div
