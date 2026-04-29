@@ -81,6 +81,7 @@ export interface SkillData {
   name: string;
   cooldown_s: number;
   duration_s?: number;
+  /** Charge-based skills can hold this many uses at once. */
   stack?: number;
 
   scope: SkillScope;     
@@ -95,6 +96,7 @@ export interface SkillData {
   shield_pct_target?: number; 
   heal_pwr?: number;
 
+  /** Manual stack/input skills such as scaling shields. */
   maxStacks?: number;
 
   invuln?: true;

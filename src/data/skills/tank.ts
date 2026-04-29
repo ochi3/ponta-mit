@@ -213,6 +213,7 @@ export const SKILLS_TANK_DRK_SECONDARY = [
   },
   {
     id: "tank.drk.oblation",
+    stack: 2,
     name: "オブレーション",
     cooldown_s: 60,
     duration_s: 10,

@@ -7,6 +7,8 @@ export interface CellVisualState {
   color: CellColor;
   checked: boolean;
   shape: CellShape;
+  chargeCount?: number;
+  chargeCapacity?: number;
 }
 
 // Color -> CSS class mapping

@@ -17,6 +17,5 @@ export function jobCmp(a: JobId, b: JobId): number {
 }
 
 export function normalizeTeam(input: JobId[]): JobId[] {
-  const uniq = Array.from(new Set(input)) as JobId[];
-  return uniq.sort(jobCmp);
+  return Array.from(new Set(input)) as JobId[];
 }

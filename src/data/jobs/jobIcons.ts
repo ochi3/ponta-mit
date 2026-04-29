@@ -2,7 +2,8 @@ import type { JobId } from "../../types";
 
 const iconModules = import.meta.glob("../../assets/icons/jobs/*.png", {
   eager: true,
-  as: "url",
+  query: "?url",
+  import: "default",
 }) as Record<string, string>;
 
 const JOB_ICON_MAP: Partial<Record<JobId, string>> = {};

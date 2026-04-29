@@ -1,5 +1,6 @@
 import type { PlanUsage, JobId } from "../types";
 import { SKILL_MAP } from "../data/skills";
+import { isChargeSkill, simulateChargeUsages } from "./skillCharges";
 
 export type IssueSeverity = "error" | "warning" | "info";
 
@@ -68,6 +69,27 @@ function validateCooldownConflicts(
 
     const cd = skill.cooldown_s ?? 0;
     if (cd === 0) continue;
+
+    if (isChargeSkill(skill)) {
+      for (const simulation of simulateChargeUsages(skill, skillUsages)) {
+        if (simulation.isValid) {
+          continue;
+        }
+
+        issues.push({
+          type: "cd_conflict",
+          severity: "error",
+          message: formatChargeConflictMessage(skill.name, simulation.usage.t_sec),
+          location: {
+            jobId: simulation.usage.jobId,
+            skillId: simulation.usage.skillId,
+            t_sec: simulation.usage.t_sec,
+            lineIndex: simulation.usage.lineIndex,
+          },
+        });
+      }
+      continue;
+    }
 
     const sorted = skillUsages.slice().sort((a, b) => {
       if (a.t_sec !== b.t_sec) return a.t_sec - b.t_sec;
@@ -277,6 +299,11 @@ function formatCdConflictMessage(skillName: string, currTime: number, prevTime: 
   const curr = formatTime(currTime);
   const prev = formatTime(prevTime);
   return `${skillName} (${curr}) と (${prev}) がクールダウン中に重複しています`;
+}
+
+function formatChargeConflictMessage(skillName: string, currTime: number): string {
+  const curr = formatTime(currTime);
+  return `${skillName} (${curr}) はスタックが足りません`;
 }
 
 function formatChildRequiresParentMessage(skillName: string, parentName: string): string {

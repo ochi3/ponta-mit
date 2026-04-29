@@ -11,28 +11,28 @@ export default function TeamPicker() {
     <div className="flex flex-wrap gap-2">
       {JOBS.slice()
         .sort((a, b) => jobCmp(a.id, b.id))
-        .map((j) => {
-          const jobName = j.name;
-          const selected = team.includes(j.id);
-          const icon = getJobIcon(j.id);
+        .map((job) => {
+          const selected = team.includes(job.id);
+          const icon = getJobIcon(job.id);
 
           return (
             <button
-              key={j.id}
-              onClick={() => toggle(j.id)}
-              className={`job-button rounded-full border border-transparent transition
-                ${selected ? "job-button-selected" : "job-button-unselected"}`}
-              title={jobName}
+              key={job.id}
+              onClick={() => toggle(job.id)}
+              className={`job-button rounded-full border border-transparent transition ${
+                selected ? "job-button-selected" : "job-button-unselected"
+              }`}
+              title={job.name}
             >
               {icon ? (
                 <img
                   src={icon}
-                  alt={j.name}
-                  className="w-10 h-10"
+                  alt={job.name}
+                  className="h-10 w-10"
                   draggable={false}
                 />
               ) : (
-                <span className="text-xs">{jobName}</span>
+                <span className="text-xs">{job.name}</span>
               )}
             </button>
           );

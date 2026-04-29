@@ -1,5 +1,6 @@
 import { getJobSkillIds, SKILL_MAP } from "../data/skills";
 import type { JobId, PlanUsage, SkillData } from "../types";
+import { getChargeStateAtSecond, isChargeSkill } from "./skillCharges";
 
 export type PracticeSkillVisualState = "ready" | "active" | "cooldown";
 
@@ -7,6 +8,8 @@ export type PracticeSkillSnapshot = {
   skill: SkillData;
   status: PracticeSkillVisualState;
   remainingSec: number | null;
+  availableCharges: number;
+  chargeCapacity: number;
 };
 
 function getVisualActiveDuration(skill: SkillData) {
@@ -48,16 +51,20 @@ export function getPracticeSkillSnapshot(
   currentTimelineSec: number | null
 ): PracticeSkillSnapshot {
   if (currentTimelineSec === null) {
+    const chargeCapacity = isChargeSkill(skill) ? Math.max(1, Math.floor(skill.stack ?? 1)) : 1;
     return {
       skill,
       status: "ready",
       remainingSec: null,
+      availableCharges: chargeCapacity,
+      chargeCapacity,
     };
   }
 
   const skillUsages = getSortedSkillUsages(usages, jobId, skill.id);
   const activeDuration = getVisualActiveDuration(skill);
   const cooldownDuration = Math.max(0, Math.floor(skill.cooldown_s ?? 0));
+  const chargeState = getChargeStateAtSecond(skill, skillUsages, currentTimelineSec);
   let activeUsage: PlanUsage | null = null;
 
   for (const usage of skillUsages) {
@@ -75,8 +82,13 @@ export function getPracticeSkillSnapshot(
   if (!activeUsage) {
     return {
       skill,
-      status: "ready",
-      remainingSec: null,
+      status: chargeState.available === 0 ? "cooldown" : "ready",
+      remainingSec:
+        chargeState.available === 0 && chargeState.nextRecoverySec !== null
+          ? Math.max(1, chargeState.nextRecoverySec - currentTimelineSec)
+          : null,
+      availableCharges: chargeState.available,
+      chargeCapacity: chargeState.capacity,
     };
   }
 
@@ -86,21 +98,30 @@ export function getPracticeSkillSnapshot(
       skill,
       status: "active",
       remainingSec: Math.max(1, activeEndSec - currentTimelineSec),
+      availableCharges: chargeState.available,
+      chargeCapacity: chargeState.capacity,
     };
   }
 
   const cooldownEndSec = activeUsage.t_sec + cooldownDuration;
-  if (currentTimelineSec < cooldownEndSec) {
+  if (!isChargeSkill(skill) && currentTimelineSec < cooldownEndSec) {
     return {
       skill,
       status: "cooldown",
       remainingSec: Math.max(1, cooldownEndSec - currentTimelineSec),
+      availableCharges: chargeState.available,
+      chargeCapacity: chargeState.capacity,
     };
   }
 
   return {
     skill,
-    status: "ready",
-    remainingSec: null,
+    status: chargeState.available === 0 ? "cooldown" : "ready",
+    remainingSec:
+      chargeState.available === 0 && chargeState.nextRecoverySec !== null
+        ? Math.max(1, chargeState.nextRecoverySec - currentTimelineSec)
+        : null,
+    availableCharges: chargeState.available,
+    chargeCapacity: chargeState.capacity,
   };
 }

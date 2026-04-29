@@ -166,7 +166,7 @@ export default function PracticeIconModePanel({
               <div className="mt-4">
                 {section.snapshots.length > 0 ? (
                   <div className="mp-practice-icon-grid">
-                    {section.snapshots.map(({ skill, status, remainingSec }) => {
+                    {section.snapshots.map(({ skill, status, remainingSec, availableCharges, chargeCapacity }) => {
                       const icon = getSkillIcon(skill.id);
                       const timerLabel = remainingSec === null ? null : String(remainingSec);
 
@@ -186,6 +186,11 @@ export default function PracticeIconModePanel({
                             ) : (
                               <span className="mp-practice-skill-fallback">
                                 {fallbackSkillLabel(skill.name)}
+                              </span>
+                            )}
+                            {chargeCapacity > 1 && (
+                              <span className="mp-practice-skill-charge">
+                                {availableCharges}
                               </span>
                             )}
                             {timerLabel && (

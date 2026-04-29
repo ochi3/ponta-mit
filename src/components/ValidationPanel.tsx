@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useStore } from "../state/store";
 import { validatePlan, type ValidationIssue } from "../logic/validation";
 
@@ -8,11 +8,12 @@ interface ValidationPanelProps {
 
 export default function ValidationPanel({ className = "" }: ValidationPanelProps) {
   const usages = useStore((s) => s.usages);
+  const deferredUsages = useDeferredValue(usages);
   const [expanded, setExpanded] = useState(false);
 
   const issues = useMemo(() => {
-    return validatePlan({ usages });
-  }, [usages]);
+    return validatePlan({ usages: deferredUsages });
+  }, [deferredUsages]);
 
   const hasIssues = issues.length > 0;
   const errorCount = issues.filter(i => i.severity === "error").length;

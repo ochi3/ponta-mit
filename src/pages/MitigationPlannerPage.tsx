@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { CSSProperties } from "react";
 import type {
   JobId,
@@ -20,12 +29,21 @@ import {
 
 import TopBar from "../components/TopBar";
 import TimelineGrid from "../components/TimelineGrid";
-import ValidationPanel from "../components/ValidationPanel";
-import PracticeModePanel from "../components/PracticeModePanel";
-import PracticeIconModePanel from "../components/PracticeIconModePanel";
-import PracticeJobSelectDialog from "../components/PracticeJobSelectDialog";
-import TimelineVideoSettingsDialog from "../components/TimelineVideoSettingsDialog";
-import TimelineSyncPointDialog from "../components/TimelineSyncPointDialog";
+
+const ValidationPanel = lazy(() => import("../components/ValidationPanel"));
+const PracticeModePanel = lazy(() => import("../components/PracticeModePanel"));
+const PracticeIconModePanel = lazy(
+  () => import("../components/PracticeIconModePanel")
+);
+const PracticeJobSelectDialog = lazy(
+  () => import("../components/PracticeJobSelectDialog")
+);
+const TimelineVideoSettingsDialog = lazy(
+  () => import("../components/TimelineVideoSettingsDialog")
+);
+const TimelineSyncPointDialog = lazy(
+  () => import("../components/TimelineSyncPointDialog")
+);
 
 const EMPTY_PRACTICE_CONFIG: TimelinePracticeConfig = {
   youtubeUrl: "",
@@ -133,6 +151,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   const shareFromUrlApplied = useRef(false);
   const practiceLayoutRef = useRef<HTMLDivElement | null>(null);
   const practiceTimelinePaneRef = useRef<HTMLDivElement | null>(null);
+  const practiceVideoSecRef = useRef<number | null>(null);
   const prevRoomIdRef = useRef<string>(getRoomId());
   const practiceConfig = useMemo(
     () => resolvePracticeConfig(roomPractice, contentPractice, tl.practice),
@@ -150,8 +169,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
         : practiceConfig.syncPoints.find((point) => point.t_sec === editingSyncSecond) ?? null,
     [editingSyncSecond, practiceConfig.syncPoints]
   );
-
-  const currentRoomId = useMemo(() => getRoomId(), [typeof window !== "undefined" ? window.location.search : ""]);
+  const currentRoomId = getRoomId();
 
   useEffect(() => {
     setSeconds(secondsInPhase(tl, undefined));
@@ -185,12 +203,21 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     setIsLoaded(false);
     setPracticeTimelineSec(null);
     setPracticeVideoSec(null);
+    practiceVideoSecRef.current = null;
     setPracticeVideoPaneWidth(null);
     setEditingSyncSecond(null);
     setPracticeJobDialogMode(null);
     setPracticeExtraJobIds([]);
     setIsVideoSettingsOpen(false);
   }, [tl.id, currentRoomId, resetTimelineState]);
+
+  useEffect(() => {
+    if (editingSyncSecond === null) {
+      setPracticeVideoSec(null);
+      return;
+    }
+    setPracticeVideoSec(practiceVideoSecRef.current);
+  }, [editingSyncSecond]);
 
   useEffect(() => {
     if (!isPracticeMode) {
@@ -319,6 +346,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     if (!supabase) return;
 
     let cancelled = false;
+    let loadFinished = false;
 
     async function loadSharedPlan() {
       try {
@@ -337,15 +365,18 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
       } catch (error) {
         console.error("Failed to load shared plan snapshot", error);
       } finally {
-        setIsLoaded(true);
+        if (!cancelled && !loadFinished) {
+          loadFinished = true;
+          setIsLoaded(true);
+        }
       }
     }
 
     const loadTimer = window.setTimeout(() => {
-      if (!isLoaded) {
-        console.warn("[Storage] Load timed out, enabling save anyway.");
-        setIsLoaded(true);
-      }
+      if (cancelled || loadFinished) return;
+      loadFinished = true;
+      console.warn("[Storage] Load timed out, enabling save anyway.");
+      setIsLoaded(true);
     }, 5000);
 
     void loadSharedPlan().finally(() => {
@@ -497,6 +528,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   function closePracticeMode() {
     setPracticeTimelineSec(null);
     setPracticeVideoSec(null);
+    practiceVideoSecRef.current = null;
     setIsPracticeMode(false);
     setPracticeJobDialogMode(null);
     setPracticeExtraJobIds([]);
@@ -573,6 +605,26 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     setEditingSyncSecond(null);
   }
 
+  const handlePracticeTimelineTimeChange = useCallback((value: number | null) => {
+    startTransition(() => {
+      setPracticeTimelineSec((prev) => (prev === value ? prev : value));
+    });
+  }, []);
+
+  const handlePracticeVideoTimeChange = useCallback(
+    (value: number | null) => {
+      practiceVideoSecRef.current = value;
+      if (editingSyncSecond === null) {
+        return;
+      }
+
+      startTransition(() => {
+        setPracticeVideoSec((prev) => (prev === value ? prev : value));
+      });
+    },
+    [editingSyncSecond]
+  );
+
   const practiceLayoutStyle = useMemo(() => {
     if (practiceVideoPaneWidth === null) {
       return undefined;
@@ -606,7 +658,9 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
               onOpenVideoSettings={() => setIsVideoSettingsOpen(true)}
               onPhaseSeconds={handlePhaseSeconds}
             />
-            <ValidationPanel />
+            <Suspense fallback={null}>
+              <ValidationPanel />
+            </Suspense>
           </div>
         </div>
 
@@ -617,29 +671,41 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
               className="mp-practice-layout"
               style={practiceLayoutStyle}
             >
-              <PracticeModePanel
-                theme={theme}
-                practice={practiceConfig}
-                currentTimelineSec={practiceTimelineSec}
-                primaryJobId={practiceSelectedJobId}
-                viewMode={practiceViewMode}
-                onClose={closePracticeMode}
-                onViewModeChange={setPracticeViewMode}
-                onTimelineTimeChange={setPracticeTimelineSec}
-                onVideoTimeChange={setPracticeVideoSec}
-              />
+              <Suspense
+                fallback={
+                  <div className="min-h-[18rem] rounded-3xl border border-slate-800/70 bg-slate-950/60" />
+                }
+              >
+                <PracticeModePanel
+                  theme={theme}
+                  practice={practiceConfig}
+                  currentTimelineSec={practiceTimelineSec}
+                  primaryJobId={practiceSelectedJobId}
+                  viewMode={practiceViewMode}
+                  onClose={closePracticeMode}
+                  onViewModeChange={setPracticeViewMode}
+                  onTimelineTimeChange={handlePracticeTimelineTimeChange}
+                  onVideoTimeChange={handlePracticeVideoTimeChange}
+                />
+              </Suspense>
 
               <div ref={practiceTimelinePaneRef} className="min-w-0">
                 {practiceViewMode === "icons" ? (
-                  <PracticeIconModePanel
-                    theme={theme}
-                    primaryJobId={practiceSelectedJobId}
-                    extraJobIds={practiceExtraJobIds}
-                    currentTimelineSec={practiceTimelineSec}
-                    canAddJobs={availableExtraPracticeJobs.length > 0}
-                    onAddJob={() => setPracticeJobDialogMode("extra")}
-                    onRemoveJob={handleRemoveExtraPracticeJob}
-                  />
+                  <Suspense
+                    fallback={
+                      <div className="min-h-[18rem] rounded-3xl border border-slate-800/70 bg-slate-950/60" />
+                    }
+                  >
+                    <PracticeIconModePanel
+                      theme={theme}
+                      primaryJobId={practiceSelectedJobId}
+                      extraJobIds={practiceExtraJobIds}
+                      currentTimelineSec={practiceTimelineSec}
+                      canAddJobs={availableExtraPracticeJobs.length > 0}
+                      onAddJob={() => setPracticeJobDialogMode("extra")}
+                      onRemoveJob={handleRemoveExtraPracticeJob}
+                    />
+                  </Suspense>
                 ) : (
                   <TimelineGrid
                     tl={tl}
@@ -666,6 +732,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
       </main>
 
       {practiceJobDialogMode !== null && (
+        <Suspense fallback={null}>
         <PracticeJobSelectDialog
           theme={theme}
           team={
@@ -695,18 +762,22 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
               : handleSelectPracticeJob
           }
         />
+        </Suspense>
       )}
 
       {isVideoSettingsOpen && (
+        <Suspense fallback={null}>
         <TimelineVideoSettingsDialog
           theme={theme}
           practice={practiceConfig}
           onClose={() => setIsVideoSettingsOpen(false)}
           onSave={handlePracticeChange}
         />
+        </Suspense>
       )}
 
       {editingSyncSecond !== null && (
+        <Suspense fallback={null}>
         <TimelineSyncPointDialog
           theme={theme}
           timelineSec={editingSyncSecond}
@@ -716,6 +787,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
           onDelete={handleDeleteSyncPoint}
           onSave={handleSaveSyncPoint}
         />
+        </Suspense>
       )}
     </div>
   );

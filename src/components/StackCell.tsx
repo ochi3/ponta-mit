@@ -1,10 +1,8 @@
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback } from "react";
 import { useStore } from "../state/store";
 import type { SkillData, JobId, PlanUsage } from "../types";
 import { type CellVisualState, getColorClass, getShapeClass } from "./cellStyles";
-
-// Special value to represent "not used" state
-const NOT_USED_VALUE = "-";
+import { getChargeCapacity, isChargeSkill } from "../logic/skillCharges";
 
 interface StackCellProps {
   jobId: JobId;
@@ -28,62 +26,101 @@ function StackCellComponent({
   const removeUsage = useStore((s) => s.removeUsage);
 
   const { color, checked, shape } = visual;
-  const maxStacks = skill.maxStacks ?? 0;
-  const currentStacks = usage?.stacks ?? 0;
+  const chargeSkill = isChargeSkill(skill);
+  const maxStacks = chargeSkill ? getChargeCapacity(skill) : skill.maxStacks ?? 0;
+  const currentStacks = checked
+    ? chargeSkill
+      ? usage?.stacks ?? 1
+      : usage?.stacks ?? 0
+    : 0;
+  const availableChargeCount = visual.chargeCount ?? maxStacks;
+  const maxSelectableStacks = chargeSkill
+    ? Math.max(availableChargeCount, currentStacks)
+    : Math.max(maxStacks, currentStacks);
 
-  // Memoize stack options to avoid recreating array on each render
-  const stackOptions = useMemo(
-    () => Array.from({ length: maxStacks + 1 }, (_, i) => i),
-    [maxStacks]
-  );
-
-  const onStackChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    
-    if (value === NOT_USED_VALUE) {
-      // Remove usage when selecting "not used"
+  const onClickCell = useCallback(() => {
+    if (chargeSkill) {
       if (checked) {
         removeUsage(jobId, skill.id, t, lineIndex);
+        return;
       }
-    } else {
-      const newStacks = parseInt(value, 10);
-      if (checked) {
-        // Update existing usage
-        updateUsageStacks(jobId, skill.id, t, lineIndex, newStacks);
-      } else {
-        // Add new usage with stacks
-        addUsage(jobId, skill.id, t, lineIndex, newStacks);
+
+      if (availableChargeCount <= 0) {
+        return;
       }
+
+      addUsage(jobId, skill.id, t, lineIndex, 1);
+      return;
     }
-  }, [checked, jobId, skill.id, t, lineIndex, addUsage, updateUsageStacks, removeUsage]);
+
+    if (maxSelectableStacks <= 0) {
+      return;
+    }
+
+    let nextStacks = 1;
+    if (checked && currentStacks > 0) {
+      nextStacks = currentStacks < maxSelectableStacks ? currentStacks + 1 : 0;
+    }
+
+    if (nextStacks <= 0) {
+      removeUsage(jobId, skill.id, t, lineIndex);
+      return;
+    }
+
+    if (checked) {
+      updateUsageStacks(jobId, skill.id, t, lineIndex, nextStacks);
+    } else {
+      addUsage(jobId, skill.id, t, lineIndex, nextStacks);
+    }
+  }, [
+    addUsage,
+    availableChargeCount,
+    checked,
+    chargeSkill,
+    currentStacks,
+    jobId,
+    lineIndex,
+    maxSelectableStacks,
+    removeUsage,
+    skill.id,
+    t,
+    updateUsageStacks,
+  ]);
 
   const isEmpty = color === "none" && shape === "none" && !checked;
-  const selectValue = checked ? String(currentStacks) : NOT_USED_VALUE;
+  const displayValue = checked && currentStacks > 0 ? String(currentStacks) : "";
+  const usageLabel = chargeSkill
+    ? `Use ${displayValue || "0"} / Ready ${availableChargeCount}`
+    : `Stacks ${displayValue || "0"}`;
+  const title = `${skill.name} (${usageLabel})`;
+  const actionLabel = checked ? "remove" : "set";
 
   return (
     <div
       className={`mp-bar ${getColorClass(color)} ${getShapeClass(shape)} ${
         isEmpty ? "mp-bar-empty" : ""
       }`}
-      title={skill.name}
+      title={title}
     >
-      <select
-        className="mp-stack-select"
-        value={selectValue}
-        onChange={onStackChange}
+      {chargeSkill && (
+        <span className="mp-charge-count" aria-hidden="true">
+          {availableChargeCount}
+        </span>
+      )}
+      <button
+        type="button"
+        className="mp-stack-button"
+        onClick={onClickCell}
+        aria-label={`${title}. Click to ${actionLabel}.`}
       >
-        <option value={NOT_USED_VALUE}>-</option>
-        {stackOptions.map((n) => (
-          <option key={n} value={String(n)}>
-            {n}
-          </option>
-        ))}
-      </select>
+        <span className="mp-stack-value" aria-hidden="true">
+          {displayValue}
+        </span>
+      </button>
     </div>
   );
 }
 
-// Memoize to prevent re-renders when props haven't changed
 export default memo(StackCellComponent, (prev, next) => {
   return (
     prev.visual.color === next.visual.color &&
@@ -93,6 +130,8 @@ export default memo(StackCellComponent, (prev, next) => {
     prev.skill.id === next.skill.id &&
     prev.t === next.t &&
     prev.lineIndex === next.lineIndex &&
-    prev.usage?.stacks === next.usage?.stacks
+    prev.usage?.stacks === next.usage?.stacks &&
+    prev.visual.chargeCount === next.visual.chargeCount &&
+    prev.visual.chargeCapacity === next.visual.chargeCapacity
   );
 });
