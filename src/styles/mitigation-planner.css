@@ -443,6 +443,35 @@ td.mp-col-freeze::after {
   color: #38bdf8;
 }
 
+.mp-job-extra-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 0.25rem;
+  cursor: pointer;
+  color: #cbd5e1;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.mp-job-extra-btn:hover {
+  background: rgba(56, 189, 248, 0.2);
+  color: #e0f2fe;
+}
+
+.mp-job-extra-btn--active {
+  background: rgba(59, 130, 246, 0.28);
+  color: #eff6ff;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.55);
+}
+
 .mp-job-expand-icon {
   display: inline-block;
   transition: transform 0.15s ease;
@@ -517,11 +546,69 @@ td.mp-col-freeze::after {
   font-variant-numeric: tabular-nums;
 }
 
+.mp-damage-number--mitigated {
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.mp-damage-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
+
+.mp-damage-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.2rem;
+}
+
+.mp-damage-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.05rem 0.35rem;
+  border-radius: 9999px;
+  font-size: 0.62rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.mp-damage-pill--mitigation {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+
+.mp-damage-pill--shield {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+}
+
+.mp-damage-pill--note {
+  background: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+}
+
+.mp-damage-original {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
 .mp-damage-dot {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   background: rgba(255, 255, 255, 0.04);
+}
+
+.mp-damage-dot-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
 }
 
 .mp-dot-icon {
@@ -583,7 +670,23 @@ td.mp-col-freeze::after {
 }
 
 .mp-practice-skill--ready .mp-practice-skill-frame {
-  border-color: rgba(71, 85, 105, 0.8);
+  border-color: rgba(34, 197, 94, 0.95);
+  background:
+    radial-gradient(circle at top, rgba(20, 83, 45, 0.42), rgba(15, 23, 42, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(187, 247, 208, 0.14),
+    0 0 0 1px rgba(34, 197, 94, 0.32),
+    0 0 20px rgba(34, 197, 94, 0.18);
+}
+
+.mp-practice-skill--card.mp-practice-skill--ready .mp-practice-skill-frame {
+  border-color: rgba(59, 130, 246, 0.95);
+  background:
+    radial-gradient(circle at top, rgba(30, 64, 175, 0.42), rgba(15, 23, 42, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(191, 219, 254, 0.18),
+    0 0 0 1px rgba(59, 130, 246, 0.35),
+    0 0 20px rgba(59, 130, 246, 0.2);
 }
 
 .mp-practice-skill--active .mp-practice-skill-frame {
@@ -722,6 +825,10 @@ td.mp-col-freeze::after {
 .cell-color-green {
   background-color: rgba(34, 197, 94, 0.18);
   border-color: #16a34a;
+}
+.cell-color-blue {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
 }
 .cell-color-red {
   background-color: rgba(248, 113, 113, 0.20);
@@ -894,6 +1001,17 @@ td.mp-col-freeze::after {
   pointer-events: none;
 }
 
+.mp-resource-value {
+  min-width: 1rem;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #f8fafc;
+  text-shadow: 0 1px 2px rgba(2, 6, 23, 0.7);
+  pointer-events: none;
+}
+
 .mp-bar-empty .mp-stack-button {
   color: #94a3b8;
 }
@@ -915,8 +1033,26 @@ td.mp-col-freeze::after {
   pointer-events: none;
 }
 
+.mp-blood-lily-count {
+  position: absolute;
+  bottom: 2px;
+  left: 3px;
+  z-index: 2;
+  min-width: 1.1rem;
+  padding: 0 0.2rem;
+  border-radius: 9999px;
+  background: rgba(136, 19, 55, 0.92);
+  color: #fecdd3;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 0.9rem;
+  text-align: center;
+  pointer-events: none;
+}
+
 /* Continuous bar border */
 .mp-bar.cell-color-green,
+.mp-bar.cell-color-blue,
 .mp-bar.cell-color-red,
 .mp-bar.cell-color-conflict {
   top: -1px;

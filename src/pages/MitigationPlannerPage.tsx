@@ -15,7 +15,7 @@ import type {
   TimelinePracticeConfig,
   VideoSyncPoint,
 } from "../types";
-import { BUILTIN_TIMELINES } from "../data/timelines/registry";
+import { isBuiltinTimelineId } from "../data/timelines/registry";
 import { decodeShareUrl } from "../logic/share";
 import { fetchSharedPlanSnapshot, saveSharedPlanSnapshot } from "../logic/sharedPlans";
 import { secondsInPhase } from "../logic/timelineView";
@@ -357,7 +357,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
 
         if (snapshot.importedTimeline) {
           setImportedTimeline(snapshot.importedTimeline);
-        } else if (tl.id in BUILTIN_TIMELINES) {
+        } else if (isBuiltinTimelineId(tl.id)) {
           setImportedTimeline(null);
         }
 

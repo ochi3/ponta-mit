@@ -17,6 +17,7 @@ type PlannerContentState = {
   team: JobId[];
   usages: PlanUsage[];
   expandedJobs: JobId[];
+  cardOnlyJobs: JobId[];
   practice: PracticeSettings;
   practiceSelectedJobId: JobId | null;
   needsRemoteSave: boolean;
@@ -31,6 +32,7 @@ type PersistedStore = {
   team?: JobId[];
   usages?: PlanUsage[];
   expandedJobs?: JobId[];
+  cardOnlyJobs?: JobId[];
 };
 
 type Store = {
@@ -41,6 +43,7 @@ type Store = {
   team: JobId[];
   usages: PlanUsage[];
   expandedJobs: JobId[];
+  cardOnlyJobs: JobId[];
 
   setTimeline(id: string): void;
   setImportedTimeline: (tl: Timeline | null) => void;
@@ -49,6 +52,7 @@ type Store = {
   removeJob(jobId: JobId): void;
   toggleJob(jobId: JobId): void;
   toggleJobExpand(jobId: JobId): void;
+  toggleJobCardOnly(jobId: JobId): void;
 
   addUsage(jobId: JobId, skillId: string, t_sec: number, lineIndex: number, stacks?: number): void;
   updateUsageStacks(jobId: JobId, skillId: string, t_sec: number, lineIndex: number, stacks: number): void;
@@ -74,6 +78,7 @@ type Store = {
 type TimelineScopedStoreState = Pick<
   Store,
   "timelineId" | "plansByTimeline" | "team" | "usages" | "expandedJobs"
+  | "cardOnlyJobs"
 >;
 
 const FALLBACK_STORAGE: StateStorage = {
@@ -92,6 +97,12 @@ function sortUsages(usages: readonly PlanUsage[]) {
 
 function normalizeExpandedJobs(expandedJobs?: readonly JobId[]) {
   return expandedJobs ? Array.from(new Set(expandedJobs)) : [];
+}
+
+function normalizeCardOnlyJobs(cardOnlyJobs?: readonly JobId[]) {
+  return cardOnlyJobs
+    ? Array.from(new Set(cardOnlyJobs.filter((jobId) => jobId === "healer.ast")))
+    : [];
 }
 
 function normalizeSyncPoints(syncPoints?: readonly VideoSyncPoint[]) {
@@ -182,6 +193,9 @@ function normalizeContentState(
     team,
     usages: sortUsages(merged.usages ?? []),
     expandedJobs: normalizeExpandedJobs(merged.expandedJobs),
+    cardOnlyJobs: normalizeCardOnlyJobs(merged.cardOnlyJobs).filter((jobId) =>
+      team.includes(jobId)
+    ),
     practice,
     practiceSelectedJobId: practice.selectedJobId,
     needsRemoteSave: merged.needsRemoteSave ?? false,
@@ -226,6 +240,7 @@ function updateTimelineState(
     team: normalizedContentState.team,
     usages: normalizedContentState.usages,
     expandedJobs: normalizedContentState.expandedJobs,
+    cardOnlyJobs: normalizedContentState.cardOnlyJobs,
   };
 }
 
@@ -251,6 +266,7 @@ function activateTimelineState(
     team: currentContentState.team,
     usages: currentContentState.usages,
     expandedJobs: currentContentState.expandedJobs,
+    cardOnlyJobs: currentContentState.cardOnlyJobs,
   };
 }
 
@@ -299,7 +315,8 @@ function mergePersistedState(
   if (
     persistedState.team !== undefined ||
     persistedState.usages !== undefined ||
-    persistedState.expandedJobs !== undefined
+    persistedState.expandedJobs !== undefined ||
+    persistedState.cardOnlyJobs !== undefined
   ) {
     const legacyTimelineId = normalizeTimelineId(
       persistedState.timelineId ?? currentState.timelineId
@@ -310,6 +327,7 @@ function mergePersistedState(
         team: persistedState.team ?? legacyBase?.team,
         usages: persistedState.usages ?? legacyBase?.usages,
         expandedJobs: persistedState.expandedJobs ?? legacyBase?.expandedJobs,
+        cardOnlyJobs: persistedState.cardOnlyJobs ?? legacyBase?.cardOnlyJobs,
       },
       legacyBase
     );
@@ -335,6 +353,7 @@ function mergePersistedState(
     team: activeContentState.team,
     usages: activeContentState.usages,
     expandedJobs: activeContentState.expandedJobs,
+    cardOnlyJobs: activeContentState.cardOnlyJobs,
   } satisfies Store;
 }
 
@@ -350,6 +369,7 @@ export const useStore = create<Store>()(
       team: [],
       usages: [],
       expandedJobs: [],
+      cardOnlyJobs: [],
 
       setTimeline: (id) =>
         set((state) => ({
@@ -427,6 +447,25 @@ export const useStore = create<Store>()(
             ...contentState,
             expandedJobs: nextExpandedJobs,
           }));
+        }),
+
+      toggleJobCardOnly: (jobId) =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          const nextCardOnlyJobs =
+            jobId !== "healer.ast"
+              ? contentState.cardOnlyJobs
+              : contentState.cardOnlyJobs.includes(jobId)
+                ? contentState.cardOnlyJobs.filter(
+                    (cardOnlyJobId) => cardOnlyJobId !== jobId
+                  )
+                : [...contentState.cardOnlyJobs, jobId];
+
+          return updateTimelineState(state, timelineId, {
+            ...contentState,
+            cardOnlyJobs: nextCardOnlyJobs,
+          });
         }),
 
       addUsage: (jobId, skillId, t_sec, lineIndex, stacks) =>

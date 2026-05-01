@@ -1,6 +1,11 @@
 import type { PlanUsage, JobId } from "../types";
 import { SKILL_MAP } from "../data/skills";
 import { isChargeSkill, simulateChargeUsages } from "./skillCharges";
+import { simulateSchAetherflow } from "./schAetherflow";
+import {
+  WHM_AFFLATUS_MISERY_ID,
+  simulateWhmLilies,
+} from "./whmLilies";
 
 export type IssueSeverity = "error" | "warning" | "info";
 
@@ -268,6 +273,93 @@ function validateParentChildRelationships(
   return issues;
 }
 
+function validateScholarAetherflow(
+  indexes: ValidationIndexes
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  for (const [jobId, jobUsages] of indexes.byJob.entries()) {
+    if (jobId !== "healer.sch" || jobUsages.length === 0) {
+      continue;
+    }
+
+    const maxSec = Math.max(...jobUsages.map((usage) => usage.t_sec), 0);
+    const simulation = simulateSchAetherflow(jobId, jobUsages, maxSec);
+
+    for (const spendSimulation of simulation.spendSimulationByUsageKey.values()) {
+      if (!spendSimulation.isSkillReady || spendSimulation.isValid) {
+        continue;
+      }
+
+      const skill = SKILL_MAP[spendSimulation.usage.skillId];
+      if (!skill) {
+        continue;
+      }
+
+      issues.push({
+        type: "resource_shortage",
+        severity: "error",
+        message: formatScholarAetherflowShortageMessage(
+          skill.name,
+          spendSimulation.usage.t_sec
+        ),
+        location: {
+          jobId: spendSimulation.usage.jobId,
+          skillId: spendSimulation.usage.skillId,
+          t_sec: spendSimulation.usage.t_sec,
+          lineIndex: spendSimulation.usage.lineIndex,
+        },
+      });
+    }
+  }
+
+  return issues;
+}
+
+function validateWhiteMageLilies(
+  indexes: ValidationIndexes
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  for (const [jobId, jobUsages] of indexes.byJob.entries()) {
+    if (jobId !== "healer.whm" || jobUsages.length === 0) {
+      continue;
+    }
+
+    const maxSec = Math.max(...jobUsages.map((usage) => usage.t_sec), 0);
+    const simulation = simulateWhmLilies(jobId, jobUsages, maxSec);
+
+    for (const useSimulation of simulation.useSimulationByUsageKey.values()) {
+      if (!useSimulation.isSkillReady || useSimulation.isValid) {
+        continue;
+      }
+
+      const skill = SKILL_MAP[useSimulation.usage.skillId];
+      if (!skill) {
+        continue;
+      }
+
+      issues.push({
+        type: "resource_shortage",
+        severity: "error",
+        message: formatWhiteMageLilyShortageMessage(
+          skill.name,
+          useSimulation.usage.skillId,
+          useSimulation.usage.t_sec
+        ),
+        location: {
+          jobId: useSimulation.usage.jobId,
+          skillId: useSimulation.usage.skillId,
+          t_sec: useSimulation.usage.t_sec,
+          lineIndex: useSimulation.usage.lineIndex,
+        },
+      });
+    }
+  }
+
+  return issues;
+}
+
 export function validatePlan(ctx: ValidationContext): ValidationIssue[] {
   const { usages } = ctx;
 
@@ -281,8 +373,27 @@ export function validatePlan(ctx: ValidationContext): ValidationIssue[] {
 
   issues.push(...validateCooldownConflicts(indexes));
   issues.push(...validateParentChildRelationships(indexes));
+  issues.push(...validateScholarAetherflow(indexes));
+  issues.push(...validateWhiteMageLilies(indexes));
 
   return issues;
+}
+
+
+function formatScholarAetherflowShortageMessage(skillName: string, time: number): string {
+  const t = formatTime(time);
+  return `${skillName} (${t}) はエーテルフローが足りません`;
+}
+
+function formatWhiteMageLilyShortageMessage(
+  skillName: string,
+  skillId: string,
+  time: number
+): string {
+  const t = formatTime(time);
+  const resourceName =
+    skillId === WHM_AFFLATUS_MISERY_ID ? "ブラッドリリー" : "ヒーリングリリー";
+  return `${skillName} (${t}) は${resourceName}が足りません`;
 }
 
 

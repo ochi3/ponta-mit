@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { JOBS } from "../data/jobs/jobs.registry";
 import { getJobIcon } from "../data/jobs/jobIcons";
 import { hasSecondarySkills } from "../data/skills";
@@ -9,6 +9,7 @@ import {
 } from "../logic/practiceIconMode";
 import { useStore } from "../state/store";
 import type { JobId, ThemeMode } from "../types";
+import { isAstCardSkill } from "../logic/astCards";
 
 type Props = {
   theme: ThemeMode;
@@ -47,6 +48,7 @@ export default function PracticeIconModePanel({
   const usages = useStore((state) => state.usages);
   const expandedJobs = useStore((state) => state.expandedJobs);
   const toggleJobExpand = useStore((state) => state.toggleJobExpand);
+  const [cardOnlyJobIds, setCardOnlyJobIds] = useState<JobId[]>([]);
   const isLight = theme === "light";
   const jobIds = useMemo(
     () =>
@@ -56,6 +58,10 @@ export default function PracticeIconModePanel({
     [extraJobIds, primaryJobId]
   );
 
+  useEffect(() => {
+    setCardOnlyJobIds((prev) => prev.filter((jobId) => jobIds.includes(jobId)));
+  }, [jobIds]);
+
   const jobSections = useMemo(
     () =>
       jobIds.map((jobId) => ({
@@ -63,12 +69,21 @@ export default function PracticeIconModePanel({
         jobName: getJobLabel(jobId),
         jobIcon: getJobIcon(jobId),
         hasSecondary: hasSecondarySkills(jobId),
+        hasCards: jobId === "healer.ast",
         personalEnabled: expandedJobs.includes(jobId),
-        snapshots: getPracticeSkillsForJob(jobId, usages, expandedJobs).map((skill) =>
+        cardsOnlyEnabled: cardOnlyJobIds.includes(jobId),
+        snapshots: getPracticeSkillsForJob(jobId, usages, expandedJobs, {
+          astCardMode: cardOnlyJobIds.includes(jobId)
+            ? "only"
+            : jobId === "healer.ast"
+              ? "show"
+              : "hide",
+          includeAstDraws: false,
+        }).map((skill) =>
           getPracticeSkillSnapshot(jobId, skill, usages, currentTimelineSec)
         ),
       })),
-    [currentTimelineSec, expandedJobs, jobIds, usages]
+    [cardOnlyJobIds, currentTimelineSec, expandedJobs, jobIds, usages]
   );
 
   const panelClass = isLight
@@ -133,7 +148,7 @@ export default function PracticeIconModePanel({
                       {section.jobName}
                     </div>
                     <div className={`mt-1 text-xs ${subtleTextClass}`}>
-                      {section.snapshots.length} skills
+                      {section.snapshots.length} スキル
                       {index === 0 ? " / メイン" : " / 追加"}
                     </div>
                   </div>
@@ -150,6 +165,28 @@ export default function PracticeIconModePanel({
                     >
                       {section.personalEnabled ? "個人 ON" : "個人 OFF"}
                     </button>
+                  )}
+                  {section.hasCards && (
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[11px] font-semibold ${subtleTextClass}`}>
+                        占星カード
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCardOnlyJobIds((prev) =>
+                            prev.includes(section.jobId)
+                              ? prev.filter((jobId) => jobId !== section.jobId)
+                              : [...prev, section.jobId]
+                          );
+                        }}
+                        className={
+                          section.cardsOnlyEnabled ? activeToggleClass : inactiveToggleClass
+                        }
+                      >
+                        {section.cardsOnlyEnabled ? "カードのみ ON" : "カードのみ OFF"}
+                      </button>
+                    </div>
                   )}
                   {index > 0 && (
                     <button
@@ -169,11 +206,14 @@ export default function PracticeIconModePanel({
                     {section.snapshots.map(({ skill, status, remainingSec, availableCharges, chargeCapacity }) => {
                       const icon = getSkillIcon(skill.id);
                       const timerLabel = remainingSec === null ? null : String(remainingSec);
+                      const isCardSkill = isAstCardSkill(skill.id);
 
                       return (
                         <div
                           key={`${section.jobId}::${skill.id}`}
-                          className={`mp-practice-skill mp-practice-skill--${status}`}
+                          className={`mp-practice-skill mp-practice-skill--${status} ${
+                            isCardSkill ? "mp-practice-skill--card" : ""
+                          }`}
                           title={skill.name}
                         >
                           <span className="mp-practice-skill-frame">

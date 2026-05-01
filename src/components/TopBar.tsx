@@ -1,7 +1,11 @@
 import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import type { ThemeMode, Timeline } from "../types";
-import { BUILTIN_TIMELINES } from "../data/timelines/registry";
+import {
+    BUILTIN_TIMELINE_OPTIONS,
+    isBuiltinTimelineId,
+    loadBuiltinTimeline,
+} from "../data/timelines/registry";
 import { secondsInPhase } from "../logic/timelineView";
 import { encodeShareUrl } from "../logic/share";
 import { parseTimelineJson } from "../logic/timelineImport";
@@ -9,8 +13,6 @@ import { useStore } from "../state/store";
 import PhaseTabs from "./PhaseTabs";
 import TeamPicker from "./TeamPicker";
 import { useI18n, resolveIntlString } from "../i18n";
-
-const BUILTIN_TIMELINE_ORDER = ["fru", "m12s-p1", "m12s-p2"] as const;
 
 function hasPracticeConfig(
     practice?: { youtubeUrl?: string; syncPoints?: readonly unknown[] } | null
@@ -47,10 +49,10 @@ export default function TopBar({
     const isCustomImport =
         importedTimelineState &&
         timelineId === importedTimelineState.id &&
-        !(timelineId in BUILTIN_TIMELINES);
+        !isBuiltinTimelineId(timelineId);
     const selectedBuiltinId = isCustomImport
         ? "__import__"
-        : timelineId && timelineId in BUILTIN_TIMELINES
+        : timelineId && isBuiltinTimelineId(timelineId)
           ? timelineId
           : "fru";
     const expandedJobs = useStore((s) => s.expandedJobs);
@@ -100,10 +102,12 @@ export default function TopBar({
         if (id === "__import__") return;
         setImportedTimeline(null);
         setTimelineId(id);
-        const built = BUILTIN_TIMELINES[id];
-        if (built) {
+        void loadBuiltinTimeline(id).then((built) => {
+            if (!built) {
+                return;
+            }
             onPhaseSeconds(secondsInPhase(built, undefined));
-        }
+        });
     }
 
     function handleImportTimelineClick() {
@@ -268,11 +272,7 @@ export default function TopBar({
                             (imported)
                         </option>
                     )}
-                    {BUILTIN_TIMELINE_ORDER.map((id) => {
-                        const built = BUILTIN_TIMELINES[id];
-                        const label = built
-                            ? resolveIntlString(built.title, undefined)
-                            : id;
+                    {BUILTIN_TIMELINE_OPTIONS.map(({ id, label }) => {
                         return (
                             <option key={id} value={id}>
                                 {label}

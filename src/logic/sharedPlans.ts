@@ -1,4 +1,4 @@
-import { BUILTIN_TIMELINES } from "../data/timelines/registry";
+import { isBuiltinTimelineId as isBuiltinTimelineKey } from "../data/timelines/registry";
 import { supabase } from "./realtime";
 import type {
   JobId,
@@ -43,15 +43,11 @@ function toSharedPlansError(error: { code?: string; message?: string }) {
   return error;
 }
 
-function isBuiltinTimelineId(timelineId: string) {
-  return timelineId in BUILTIN_TIMELINES;
-}
-
 function shouldPersistTimeline(timelineId: string, importedTimeline: Timeline | null) {
   return Boolean(
     importedTimeline &&
       importedTimeline.id === timelineId &&
-      !isBuiltinTimelineId(timelineId)
+      !isBuiltinTimelineKey(timelineId)
   );
 }
 

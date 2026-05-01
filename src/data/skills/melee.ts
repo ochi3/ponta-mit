@@ -10,7 +10,7 @@ export const SKILLS_MELEE = [
     scope: "single_target",
     phys_pct: 0.9,
     magic_pct: 0.95,
-    unique_pct: 1.0,
+    unique_pct: 1,
     kinds: ["mitigation"],
     icon: SKILL_ICON["melee.feint"],
   },

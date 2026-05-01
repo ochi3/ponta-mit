@@ -29,6 +29,40 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
     ],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            const normalizedId = id.replace(/\\/g, "/");
+
+            if (!normalizedId.includes("node_modules")) {
+              return undefined;
+            }
+
+            if (
+              normalizedId.includes("/react/") ||
+              normalizedId.includes("/react-dom/") ||
+              normalizedId.includes("/scheduler/")
+            ) {
+              return "react-vendor";
+            }
+
+            if (
+              normalizedId.includes("/@supabase/") ||
+              normalizedId.includes("/ws/")
+            ) {
+              return "supabase-vendor";
+            }
+
+            if (normalizedId.includes("/zustand/")) {
+              return "state-vendor";
+            }
+
+            return "vendor";
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),

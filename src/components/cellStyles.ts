@@ -1,6 +1,6 @@
 // Shared cell style utilities
 
-export type CellColor = "none" | "green" | "red" | "conflict";
+export type CellColor = "none" | "green" | "blue" | "red" | "conflict";
 export type CellShape = "none" | "alone" | "start" | "middle" | "end";
 
 export interface CellVisualState {
@@ -9,11 +9,13 @@ export interface CellVisualState {
   shape: CellShape;
   chargeCount?: number;
   chargeCapacity?: number;
+  bloodCount?: number;
 }
 
 // Color -> CSS class mapping
 const COLOR_CLASS: Record<CellColor, string> = {
   green: "cell-color-green",
+  blue: "cell-color-blue",
   red: "cell-color-red",
   conflict: "cell-color-conflict",
   none: "cell-color-none",
