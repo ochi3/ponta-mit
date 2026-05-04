@@ -441,6 +441,13 @@ export const SKILLS_HEALER_SCH_SECONDARY = [
 
 export const SKILLS_HEALER_SGE = [
   {
+    id: "healer.sge.addersgall",
+    name: "アダーガル",
+    cooldown_s: 0,
+    scope: "self",
+    kinds: ["utility"],
+  },
+  {
     id: "healer.sge.kerachole",
     name: "ケーラコレ",
     cooldown_s: 30,
@@ -503,6 +510,27 @@ export const SKILLS_HEALER_SGE = [
 ] as const satisfies readonly SkillData[];
 
 export const SKILLS_HEALER_SGE_SECONDARY = [
+  {
+    id: "healer.sge.rhizomata",
+    name: "リゾーマタ",
+    cooldown_s: 90,
+    scope: "self",
+    kinds: ["utility"],
+  },
+  {
+    id: "healer.sge.druochole",
+    name: "ドルオコレ",
+    cooldown_s: 1,
+    scope: "single_target",
+    kinds: ["heal"],
+  },
+  {
+    id: "healer.sge.ixochole",
+    name: "イックソコレ",
+    cooldown_s: 30,
+    scope: "range_party",
+    kinds: ["heal"],
+  },
   {
     id: "healer.sge.taurochole",
     name: "タウロコレ",

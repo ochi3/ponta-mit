@@ -24,6 +24,16 @@ type PlannerContentState = {
   lastRemoteSavedAt: string | null;
 };
 
+type PlannerHistorySnapshot = Pick<
+  PlannerContentState,
+  | "team"
+  | "usages"
+  | "expandedJobs"
+  | "cardOnlyJobs"
+  | "practice"
+  | "practiceSelectedJobId"
+>;
+
 type PersistedStore = {
   timelineId?: string;
   importedTimeline?: Timeline | null;
@@ -44,6 +54,8 @@ type Store = {
   usages: PlanUsage[];
   expandedJobs: JobId[];
   cardOnlyJobs: JobId[];
+  undoStackByTimeline: Record<string, PlannerHistorySnapshot[]>;
+  redoStackByTimeline: Record<string, PlannerHistorySnapshot[]>;
 
   setTimeline(id: string): void;
   setImportedTimeline: (tl: Timeline | null) => void;
@@ -69,6 +81,8 @@ type Store = {
   applyPersistedSharedState(payload: SharePayload, updatedAt?: string | null): void;
   markTimelineSaved(timelineId?: string, updatedAt?: string | null): void;
   applyExternalUsage(event: string, payload: unknown, timelineId?: string): void;
+  undo(): void;
+  redo(): void;
 
   requestState(timelineId?: string): void;
   broadcastCurrentState(timelineId?: string): void;
@@ -80,6 +94,8 @@ type TimelineScopedStoreState = Pick<
   "timelineId" | "plansByTimeline" | "team" | "usages" | "expandedJobs"
   | "cardOnlyJobs"
 >;
+
+const HISTORY_LIMIT = 50;
 
 const FALLBACK_STORAGE: StateStorage = {
   getItem: () => null,
@@ -210,6 +226,35 @@ function getContentState(
   return plansByTimeline[timelineId] ?? normalizeContentState();
 }
 
+function createHistorySnapshot(
+  contentState: PlannerContentState
+): PlannerHistorySnapshot {
+  return {
+    team: [...contentState.team],
+    usages: contentState.usages.map((usage) => ({ ...usage })),
+    expandedJobs: [...contentState.expandedJobs],
+    cardOnlyJobs: [...contentState.cardOnlyJobs],
+    practice: {
+      youtubeUrl: contentState.practice.youtubeUrl,
+      syncPoints: contentState.practice.syncPoints.map((point) => ({ ...point })),
+      selectedJobId: contentState.practice.selectedJobId,
+    },
+    practiceSelectedJobId: contentState.practiceSelectedJobId,
+  };
+}
+
+function pushHistorySnapshot(
+  stacksByTimeline: Record<string, PlannerHistorySnapshot[]>,
+  timelineId: string,
+  snapshot: PlannerHistorySnapshot
+) {
+  const stack = stacksByTimeline[timelineId] ?? [];
+  return {
+    ...stacksByTimeline,
+    [timelineId]: [...stack, snapshot].slice(-HISTORY_LIMIT),
+  };
+}
+
 function updateTimelineState(
   state: TimelineScopedStoreState,
   timelineId: string,
@@ -241,6 +286,38 @@ function updateTimelineState(
     usages: normalizedContentState.usages,
     expandedJobs: normalizedContentState.expandedJobs,
     cardOnlyJobs: normalizedContentState.cardOnlyJobs,
+  };
+}
+
+function updateTimelineStateWithHistory(
+  state: Store,
+  timelineId: string,
+  nextContentState: Partial<PlannerContentState>
+) {
+  const normalizedTimelineId = normalizeTimelineId(timelineId);
+  const currentContentState = getContentState(
+    state.plansByTimeline,
+    normalizedTimelineId
+  );
+
+  return {
+    ...updateTimelineState(
+      state,
+      normalizedTimelineId,
+      withRemoteSaveQueued({
+        ...currentContentState,
+        ...nextContentState,
+      })
+    ),
+    undoStackByTimeline: pushHistorySnapshot(
+      state.undoStackByTimeline,
+      normalizedTimelineId,
+      createHistorySnapshot(currentContentState)
+    ),
+    redoStackByTimeline: {
+      ...state.redoStackByTimeline,
+      [normalizedTimelineId]: [],
+    },
   };
 }
 
@@ -287,6 +364,19 @@ function broadcast(event: string, payload: unknown, timelineId: string) {
     event,
     payload,
   });
+}
+
+function broadcastSyncState(contentState: PlannerHistorySnapshot, timelineId: string) {
+  broadcast(
+    REALTIME_EVENTS.SYNC_STATE,
+    {
+      team: contentState.team,
+      usages: contentState.usages,
+      expandedJobs: contentState.expandedJobs,
+      practice: toTimelinePracticeConfig(contentState.practice),
+    },
+    timelineId
+  );
 }
 
 function mergePersistedState(
@@ -370,6 +460,8 @@ export const useStore = create<Store>()(
       usages: [],
       expandedJobs: [],
       cardOnlyJobs: [],
+      undoStackByTimeline: {},
+      redoStackByTimeline: {},
 
       setTimeline: (id) =>
         set((state) => ({
@@ -384,11 +476,11 @@ export const useStore = create<Store>()(
           const contentState = getContentState(state.plansByTimeline, timelineId);
           const nextTeam = normalizeTeam(team);
           broadcast(REALTIME_EVENTS.TEAM_UPDATED, nextTeam, timelineId);
-          return updateTimelineState(state, timelineId, withRemoteSaveQueued({
+          return updateTimelineStateWithHistory(state, timelineId, {
             ...contentState,
             team: nextTeam,
             practice: syncPracticeSelection(nextTeam, contentState.practice),
-          }));
+          });
         }),
 
       addJob: (jobId) =>
@@ -401,11 +493,11 @@ export const useStore = create<Store>()(
 
           const nextTeam = normalizeTeam([...contentState.team, jobId]);
           broadcast(REALTIME_EVENTS.TEAM_UPDATED, nextTeam, timelineId);
-          return updateTimelineState(state, timelineId, withRemoteSaveQueued({
+          return updateTimelineStateWithHistory(state, timelineId, {
             ...contentState,
             team: nextTeam,
             practice: syncPracticeSelection(nextTeam, contentState.practice),
-          }));
+          });
         }),
 
       removeJob: (jobId) =>
@@ -414,11 +506,11 @@ export const useStore = create<Store>()(
           const contentState = getContentState(state.plansByTimeline, timelineId);
           const nextTeam = contentState.team.filter((memberId) => memberId !== jobId);
           broadcast(REALTIME_EVENTS.TEAM_UPDATED, nextTeam, timelineId);
-          return updateTimelineState(state, timelineId, withRemoteSaveQueued({
+          return updateTimelineStateWithHistory(state, timelineId, {
             ...contentState,
             team: nextTeam,
             practice: syncPracticeSelection(nextTeam, contentState.practice),
-          }));
+          });
         }),
 
       toggleJob: (jobId) =>
@@ -429,11 +521,11 @@ export const useStore = create<Store>()(
             ? contentState.team.filter((memberId) => memberId !== jobId)
             : normalizeTeam([...contentState.team, jobId]);
           broadcast(REALTIME_EVENTS.TEAM_UPDATED, nextTeam, timelineId);
-          return updateTimelineState(state, timelineId, withRemoteSaveQueued({
+          return updateTimelineStateWithHistory(state, timelineId, {
             ...contentState,
             team: nextTeam,
             practice: syncPracticeSelection(nextTeam, contentState.practice),
-          }));
+          });
         }),
 
       toggleJobExpand: (jobId) =>
@@ -443,10 +535,10 @@ export const useStore = create<Store>()(
           const nextExpandedJobs = contentState.expandedJobs.includes(jobId)
             ? contentState.expandedJobs.filter((expandedJobId) => expandedJobId !== jobId)
             : [...contentState.expandedJobs, jobId];
-          return updateTimelineState(state, timelineId, withRemoteSaveQueued({
+          return updateTimelineStateWithHistory(state, timelineId, {
             ...contentState,
             expandedJobs: nextExpandedJobs,
-          }));
+          });
         }),
 
       toggleJobCardOnly: (jobId) =>
@@ -462,7 +554,7 @@ export const useStore = create<Store>()(
                   )
                 : [...contentState.cardOnlyJobs, jobId];
 
-          return updateTimelineState(state, timelineId, {
+          return updateTimelineStateWithHistory(state, timelineId, {
             ...contentState,
             cardOnlyJobs: nextCardOnlyJobs,
           });
@@ -488,10 +580,10 @@ export const useStore = create<Store>()(
 
           broadcast(REALTIME_EVENTS.USAGE_ADDED, newUsage, timelineId);
 
-          return updateTimelineState(state, timelineId, withRemoteSaveQueued({
+          return updateTimelineStateWithHistory(state, timelineId, {
             ...contentState,
             usages: [...others, newUsage],
-          }));
+          });
         }),
 
       updateUsageStacks: (jobId, skillId, t_sec, lineIndex, stacks) =>
@@ -503,7 +595,7 @@ export const useStore = create<Store>()(
             { jobId, skillId, t_sec, lineIndex, stacks },
             timelineId
           );
-          return updateTimelineState(state, timelineId, withRemoteSaveQueued({
+          return updateTimelineStateWithHistory(state, timelineId, {
             ...contentState,
             usages: contentState.usages.map((usage) =>
               usage.jobId === jobId &&
@@ -513,7 +605,7 @@ export const useStore = create<Store>()(
                 ? { ...usage, stacks }
                 : usage
             ),
-          }));
+          });
         }),
 
       removeUsage: (jobId, skillId, t_sec, lineIndex) =>
@@ -525,7 +617,7 @@ export const useStore = create<Store>()(
             { jobId, skillId, t_sec, lineIndex },
             timelineId
           );
-          return updateTimelineState(state, timelineId, withRemoteSaveQueued({
+          return updateTimelineStateWithHistory(state, timelineId, {
             ...contentState,
             usages: contentState.usages.filter(
               (usage) =>
@@ -536,7 +628,7 @@ export const useStore = create<Store>()(
                   usage.lineIndex === lineIndex
                 )
             ),
-          }));
+          });
         }),
 
       clearUsages: () =>
@@ -544,22 +636,22 @@ export const useStore = create<Store>()(
           const timelineId = normalizeTimelineId(state.timelineId);
           const contentState = getContentState(state.plansByTimeline, timelineId);
           broadcast(REALTIME_EVENTS.CLEAR_ALL, {}, timelineId);
-          return updateTimelineState(state, timelineId, withRemoteSaveQueued({
+          return updateTimelineStateWithHistory(state, timelineId, {
             ...contentState,
             usages: [],
-          }));
+          });
         }),
 
       removeUsageForSkill: (jobId, skillId) =>
         set((state) => {
           const timelineId = normalizeTimelineId(state.timelineId);
           const contentState = getContentState(state.plansByTimeline, timelineId);
-          return updateTimelineState(state, timelineId, withRemoteSaveQueued({
+          return updateTimelineStateWithHistory(state, timelineId, {
             ...contentState,
             usages: contentState.usages.filter(
               (usage) => !(usage.jobId === jobId && usage.skillId === skillId)
             ),
-          }));
+          });
         }),
 
       setPracticeConfig: (practice) =>
@@ -580,10 +672,10 @@ export const useStore = create<Store>()(
             timelineId
           );
           return {
-            ...updateTimelineState(state, timelineId, withRemoteSaveQueued({
+            ...updateTimelineStateWithHistory(state, timelineId, {
               ...contentState,
               practice: nextPractice,
-            })),
+            }),
             practiceDefaultsByTimeline: {
               ...state.practiceDefaultsByTimeline,
               [timelineId]: toTimelinePracticeConfig(nextPractice),
@@ -605,10 +697,10 @@ export const useStore = create<Store>()(
             timelineId
           );
           return {
-            ...updateTimelineState(state, timelineId, withRemoteSaveQueued({
+            ...updateTimelineStateWithHistory(state, timelineId, {
               ...contentState,
               practice: nextPractice,
-            })),
+            }),
             practiceDefaultsByTimeline: {
               ...state.practiceDefaultsByTimeline,
               [timelineId]: toTimelinePracticeConfig(nextPractice),
@@ -630,10 +722,10 @@ export const useStore = create<Store>()(
             timelineId
           );
           return {
-            ...updateTimelineState(state, timelineId, withRemoteSaveQueued({
+            ...updateTimelineStateWithHistory(state, timelineId, {
               ...contentState,
               practice: nextPractice,
-            })),
+            }),
             practiceDefaultsByTimeline: {
               ...state.practiceDefaultsByTimeline,
               [timelineId]: toTimelinePracticeConfig(nextPractice),
@@ -645,7 +737,7 @@ export const useStore = create<Store>()(
         set((state) => {
           const timelineId = normalizeTimelineId(state.timelineId);
           const contentState = getContentState(state.plansByTimeline, timelineId);
-          return updateTimelineState(state, timelineId, {
+          return updateTimelineStateWithHistory(state, timelineId, {
             ...contentState,
             practice: syncPracticeSelection(contentState.team, {
               ...contentState.practice,
@@ -841,6 +933,86 @@ export const useStore = create<Store>()(
           }
 
           return {};
+        }),
+
+      undo: () =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const undoStack = state.undoStackByTimeline[timelineId] ?? [];
+          const previousSnapshot = undoStack[undoStack.length - 1];
+          if (!previousSnapshot) {
+            return {};
+          }
+
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          const currentSnapshot = createHistorySnapshot(contentState);
+          const nextUndoStack = undoStack.slice(0, -1);
+          const nextRedoStack = pushHistorySnapshot(
+            state.redoStackByTimeline,
+            timelineId,
+            currentSnapshot
+          )[timelineId];
+
+          broadcastSyncState(previousSnapshot, timelineId);
+
+          return {
+            ...updateTimelineState(
+              state,
+              timelineId,
+              withRemoteSaveQueued({
+                ...contentState,
+                ...previousSnapshot,
+              })
+            ),
+            undoStackByTimeline: {
+              ...state.undoStackByTimeline,
+              [timelineId]: nextUndoStack,
+            },
+            redoStackByTimeline: {
+              ...state.redoStackByTimeline,
+              [timelineId]: nextRedoStack,
+            },
+          };
+        }),
+
+      redo: () =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const redoStack = state.redoStackByTimeline[timelineId] ?? [];
+          const nextSnapshot = redoStack[redoStack.length - 1];
+          if (!nextSnapshot) {
+            return {};
+          }
+
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          const currentSnapshot = createHistorySnapshot(contentState);
+          const nextRedoStack = redoStack.slice(0, -1);
+          const nextUndoStack = pushHistorySnapshot(
+            state.undoStackByTimeline,
+            timelineId,
+            currentSnapshot
+          )[timelineId];
+
+          broadcastSyncState(nextSnapshot, timelineId);
+
+          return {
+            ...updateTimelineState(
+              state,
+              timelineId,
+              withRemoteSaveQueued({
+                ...contentState,
+                ...nextSnapshot,
+              })
+            ),
+            undoStackByTimeline: {
+              ...state.undoStackByTimeline,
+              [timelineId]: nextUndoStack,
+            },
+            redoStackByTimeline: {
+              ...state.redoStackByTimeline,
+              [timelineId]: nextRedoStack,
+            },
+          };
         }),
 
       requestState: (timelineId) => {

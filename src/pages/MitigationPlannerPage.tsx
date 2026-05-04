@@ -19,6 +19,7 @@ import { isBuiltinTimelineId } from "../data/timelines/registry";
 import { decodeShareUrl } from "../logic/share";
 import { fetchSharedPlanSnapshot, saveSharedPlanSnapshot } from "../logic/sharedPlans";
 import { secondsInPhase } from "../logic/timelineView";
+import type { ValidationIssue } from "../logic/validation";
 import { useStore } from "../state/store";
 import {
   supabase,
@@ -127,6 +128,10 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   const [practiceViewMode, setPracticeViewMode] = useState<PracticeViewMode>("timeline");
   const [practiceExtraJobIds, setPracticeExtraJobIds] = useState<JobId[]>([]);
   const [editingSyncSecond, setEditingSyncSecond] = useState<number | null>(null);
+  const [validationFocus, setValidationFocus] = useState<{
+    location: NonNullable<ValidationIssue["location"]>;
+    requestKey: number;
+  } | null>(null);
   const team = useStore((s) => s.team);
   const usages = useStore((s) => s.usages);
   const expandedJobs = useStore((s) => s.expandedJobs);
@@ -573,6 +578,17 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     setEditingSyncSecond(sec);
   }
 
+  function handleSelectValidationIssue(issue: ValidationIssue) {
+    if (!issue.location) {
+      return;
+    }
+
+    setValidationFocus({
+      location: issue.location,
+      requestKey: Date.now(),
+    });
+  }
+
   function handleSaveSyncPoint(videoSec: number) {
     if (editingSyncSecond === null) {
       return;
@@ -659,7 +675,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
               onPhaseSeconds={handlePhaseSeconds}
             />
             <Suspense fallback={null}>
-              <ValidationPanel />
+              <ValidationPanel onSelectIssue={handleSelectValidationIssue} />
             </Suspense>
           </div>
         </div>
@@ -712,7 +728,10 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
                     seconds={practiceSeconds}
                     jobFilter={practiceSelectedJobId}
                     focusJobId={practiceSelectedJobId}
-                    focusSecond={practiceTimelineSec}
+                    focusSecond={validationFocus?.location.t_sec ?? practiceTimelineSec}
+                    focusLineIndex={validationFocus?.location.lineIndex}
+                    focusSkillId={validationFocus?.location.skillId}
+                    focusRequestKey={validationFocus?.requestKey}
                     followTime
                     onTimeClick={handleTimeClick}
                     syncSeconds={syncSeconds}
@@ -725,6 +744,10 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
           <TimelineGrid
             tl={tl}
             seconds={seconds}
+            focusSecond={validationFocus?.location.t_sec}
+            focusLineIndex={validationFocus?.location.lineIndex}
+            focusSkillId={validationFocus?.location.skillId}
+            focusRequestKey={validationFocus?.requestKey}
             onTimeClick={handleTimeClick}
             syncSeconds={syncSeconds}
           />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, DragEvent, JSX } from "react";
+import type { CSSProperties, DragEvent, JSX, MouseEvent } from "react";
 import { useStore } from "../state/store";
 import { JOBS } from "../data/jobs/jobs.registry";
 import { JOB_SKILLS, SKILL_MAP, hasSecondarySkills, getJobSkillIds } from "../data/skills";
@@ -7,6 +7,7 @@ import type { Timeline, JobId, SkillData, Moment, ElementType, PlanUsage } from 
 import Cell, { type CellVisualState } from "./Cell";
 import AstDrawCell from "./AstDrawCell";
 import SchAetherflowCell from "./SchAetherflowCell";
+import SgeAddersgallCell from "./SgeAddersgallCell";
 import WhmLilyCell from "./WhmLilyCell";
 import StackCell from "./StackCell";
 import { formatSec } from "../logic/timelineView";
@@ -18,6 +19,7 @@ import {
   isUsageActiveAtPoint,
   summarizeMitigation,
 } from "../logic/mitigation";
+import { validatePlan, type ValidationIssue } from "../logic/validation";
 import {
   buildAstDrawSlots,
   drawGrantsAstCard,
@@ -46,12 +48,23 @@ import {
   isWhmLilySkill,
   simulateWhmLilies,
 } from "../logic/whmLilies";
+import {
+  getSgeAddersgallStateAtPoint,
+  isSgeAddersgallSkill,
+  isSgeAddersgallSpenderSkill,
+  simulateSgeAddersgall,
+} from "../logic/sgeAddersgall";
 import { useI18n } from "../i18n";
 
 type Col = { jobId: JobId; jobName: string; skill: SkillData };
 type DropIndicator = {
   jobId: JobId;
   position: "before" | "after";
+};
+type DamagePopoverState = {
+  rowIndex: number;
+  x: number;
+  y: number;
 };
 
 const SKILL_COL_CSS_VAR = "var(--mp-skill-col-w)";
@@ -199,6 +212,15 @@ function comparePoints(
   return leftLineIndex - rightLineIndex;
 }
 
+type ValidationLocation = NonNullable<ValidationIssue["location"]>;
+
+function validationLocationKey(location: ValidationLocation) {
+  return `${location.jobId}::${location.skillId}::${location.t_sec}::${location.lineIndex}`;
+}
+
+function validationRowKey(location: Pick<ValidationLocation, "t_sec" | "lineIndex">) {
+  return `${location.t_sec}::${location.lineIndex}`;
+}
 
 export default function TimelineGrid({
   tl,
@@ -209,6 +231,9 @@ export default function TimelineGrid({
   followTime = false,
   onTimeClick,
   syncSeconds,
+  focusLineIndex,
+  focusSkillId,
+  focusRequestKey,
 }: {
   tl: Timeline;
   seconds: number[];
@@ -218,6 +243,9 @@ export default function TimelineGrid({
   followTime?: boolean;
   onTimeClick?: (sec: number) => void;
   syncSeconds?: readonly number[];
+  focusLineIndex?: number | null;
+  focusSkillId?: string | null;
+  focusRequestKey?: number;
 }) {
   const { t } = useI18n();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -230,6 +258,7 @@ export default function TimelineGrid({
   const toggleJobCardOnly = useStore((s) => s.toggleJobCardOnly);
   const [draggingJobId, setDraggingJobId] = useState<JobId | null>(null);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
+  const [damagePopover, setDamagePopover] = useState<DamagePopoverState | null>(null);
   const hasMechanisms = Boolean(tl.mechanisms?.length);
   const syncSecondsSet = useMemo(
     () => new Set(syncSeconds ?? []),
@@ -298,6 +327,40 @@ export default function TimelineGrid({
     }
     return map;
   }, [usages]);
+
+  const validationIssues = useMemo(() => {
+    return validatePlan({ usages });
+  }, [usages]);
+
+  const validationIssuesByLocation = useMemo(() => {
+    const map = new Map<string, ValidationIssue>();
+
+    for (const issue of validationIssues) {
+      if (issue.location) {
+        map.set(validationLocationKey(issue.location), issue);
+      }
+      if (issue.relatedLocation) {
+        map.set(validationLocationKey(issue.relatedLocation), issue);
+      }
+    }
+
+    return map;
+  }, [validationIssues]);
+
+  const validationRows = useMemo(() => {
+    const set = new Set<string>();
+
+    for (const issue of validationIssues) {
+      if (issue.location) {
+        set.add(validationRowKey(issue.location));
+      }
+      if (issue.relatedLocation) {
+        set.add(validationRowKey(issue.relatedLocation));
+      }
+    }
+
+    return set;
+  }, [validationIssues]);
 
   const cols: Col[] = useMemo(() => {
     const out: Col[] = [];
@@ -392,6 +455,10 @@ export default function TimelineGrid({
       typeof value === "number"
       ? value.toLocaleString("ja-JP")
       : "—";
+  const formatPct = (value: number) => {
+    const pct = value * 100;
+    return Number.isInteger(pct) ? `${pct}%` : `${pct.toFixed(1)}%`;
+  };
 
   const mechanismNames = useMemo(
     () => mechanismNamesAtSeconds(tl, seconds),
@@ -499,6 +566,21 @@ export default function TimelineGrid({
     return map;
   }, [seconds, usages, visibleTeam]);
 
+  const sgeAddersgallSimulationByJob = useMemo(() => {
+    const map = new Map<JobId, ReturnType<typeof simulateSgeAddersgall>>();
+    const maxSec = seconds[seconds.length - 1] ?? 0;
+
+    for (const jobId of visibleTeam) {
+      if (jobId !== "healer.sge") {
+        continue;
+      }
+
+      map.set(jobId, simulateSgeAddersgall(jobId, usages, maxSec));
+    }
+
+    return map;
+  }, [seconds, usages, visibleTeam]);
+
   useEffect(() => {
     if (!followTime || focusSecond === null || focusSecond === undefined) {
       return;
@@ -525,6 +607,41 @@ export default function TimelineGrid({
       targetRow.scrollIntoView({ block: "center" });
     }
   }, [followTime, focusSecond]);
+
+  useEffect(() => {
+    if (
+      focusRequestKey === undefined ||
+      focusSecond === null ||
+      focusSecond === undefined ||
+      focusLineIndex === null ||
+      focusLineIndex === undefined
+    ) {
+      return;
+    }
+
+    const wrapper = wrapperRef.current;
+    if (!wrapper) {
+      return;
+    }
+
+    const rowKey = `${focusSecond}::${focusLineIndex}`;
+    const targetRow = wrapper.querySelector<HTMLTableRowElement>(
+      `tr[data-row-key="${rowKey}"]`
+    );
+    const targetCell =
+      focusSkillId
+        ? wrapper.querySelector<HTMLTableCellElement>(
+            `td[data-cell-key$="::${focusSecond}::${focusLineIndex}"][data-skill-id="${focusSkillId}"]`
+          )
+        : null;
+
+    if (targetRow) {
+      targetRow.scrollIntoView({ block: "center" });
+    }
+    if (targetCell) {
+      targetCell.scrollIntoView({ inline: "center", block: "nearest" });
+    }
+  }, [focusLineIndex, focusRequestKey, focusSecond, focusSkillId]);
 
   useEffect(() => {
     if (!focusJobId) {
@@ -935,6 +1052,125 @@ export default function TimelineGrid({
         continue;
       }
 
+      const sgeAddersgallSimulation = sgeAddersgallSimulationByJob.get(col.jobId);
+      if (isSgeAddersgallSkill(col.skill.id) && sgeAddersgallSimulation) {
+        for (let r = 0; r < rows.length; r++) {
+          const row = rows[r];
+          const rowKey = `${col.jobId}::${col.skill.id}::${row.sec}::${row.lineIndex}`;
+          const addersgallState = getSgeAddersgallStateAtPoint(
+            sgeAddersgallSimulation,
+            row.sec,
+            row.lineIndex
+          );
+          const checked = sgeAddersgallSimulation.manualOverrideKeys.has(rowKey);
+
+          vis[ci][r] = {
+            color: checked ? "green" : "none",
+            checked,
+            shape: "none",
+            chargeCount: addersgallState.available,
+          };
+        }
+
+        continue;
+      }
+
+      if (isSgeAddersgallSpenderSkill(col.skill.id) && sgeAddersgallSimulation) {
+        const cd = Math.max(0, Math.floor(col.skill.cooldown_s ?? 0));
+        const effectCounts = new Array(rows.length).fill(0);
+        const cooldownCounts = new Array(rows.length).fill(0);
+        const checkedRows = new Set<number>();
+        const skillUsageSimulations = skillUsages
+          .map((usage) =>
+            sgeAddersgallSimulation.useSimulationByUsageKey.get(
+              `${usage.jobId}::${usage.skillId}::${usage.t_sec}::${usage.lineIndex}`
+            )
+          )
+          .filter((simulation): simulation is NonNullable<typeof simulation> => Boolean(simulation));
+
+        const findFirstRowAfter = (targetSec: number): number => {
+          let lo = 0, hi = rows.length;
+          while (lo < hi) {
+            const mid = (lo + hi) >> 1;
+            if (rowToSec[mid] <= targetSec) lo = mid + 1;
+            else hi = mid;
+          }
+          return lo;
+        };
+
+        for (const simulation of skillUsageSimulations) {
+          const startRowIdx = rowIndexLookup.get(
+            `${simulation.usage.t_sec}::${simulation.usage.lineIndex}`
+          );
+          if (startRowIdx !== undefined) {
+            checkedRows.add(startRowIdx);
+          }
+
+          if (!simulation.isValid) {
+            continue;
+          }
+
+          if (dur > 0) {
+            const effectEndSec = simulation.usage.t_sec + dur;
+            const effectStartRow = findFirstRowAtOrAfter(simulation.usage.t_sec);
+            const effectEndRow = findFirstRowAtOrAfter(effectEndSec);
+
+            for (let r = effectStartRow; r < effectEndRow; r++) {
+              const row = rows[r];
+              if (
+                row.sec === simulation.usage.t_sec &&
+                row.lineIndex < simulation.usage.lineIndex
+              ) {
+                continue;
+              }
+              effectCounts[r] += 1;
+            }
+          }
+
+          if (cd > 0) {
+            const cdStartSec = simulation.usage.t_sec + dur;
+            const cdEndSec = simulation.usage.t_sec + cd;
+
+            if (cdStartSec < cdEndSec) {
+              const cdStartRow = findFirstRowAtOrAfter(cdStartSec);
+              const cdEndRow = findFirstRowAfter(cdEndSec);
+
+              for (let r = cdStartRow; r < cdEndRow; r++) {
+                cooldownCounts[r] += 1;
+              }
+            }
+          }
+        }
+
+        for (let r = 0; r < rows.length; r++) {
+          const row = rows[r];
+          const checked = checkedRows.has(r);
+          const simulation = sgeAddersgallSimulation.useSimulationByUsageKey.get(
+            `${col.jobId}::${col.skill.id}::${row.sec}::${row.lineIndex}`
+          );
+          const effectCount = effectCounts[r];
+          const cooldownCount = cooldownCounts[r];
+
+          let color: "none" | "green" | "blue" | "red" | "conflict" = "none";
+
+          if (simulation && !simulation.isValid) {
+            color = "conflict";
+          } else if (effectCount >= 1 || checked) {
+            color = "green";
+          } else if (cooldownCount >= 1) {
+            color = "red";
+          }
+
+          vis[ci][r] = {
+            color,
+            checked,
+            shape: "none",
+          };
+        }
+
+        continue;
+      }
+
       const schAetherflowSimulation = schAetherflowSimulationByJob.get(col.jobId);
       if (isSchAetherflowSkill(col.skill.id) && schAetherflowSimulation) {
         for (let r = 0; r < rows.length; r++) {
@@ -1297,6 +1533,7 @@ export default function TimelineGrid({
     rowToSec,
     rows,
     schAetherflowSimulationByJob,
+    sgeAddersgallSimulationByJob,
     usagesByJobSkill,
     whmLilySimulationByJob,
   ]);
@@ -1428,6 +1665,108 @@ export default function TimelineGrid({
     return <div className="mp-damage-stack">{chunks}</div>;
   };
 
+  const updateDamagePopover = (
+    rowIndex: number,
+    event: MouseEvent<HTMLElement>
+  ) => {
+    const popoverWidth = 360;
+    const popoverHeight = 260;
+    const margin = 12;
+    const left = Math.min(
+      event.clientX + 16,
+      Math.max(margin, window.innerWidth - popoverWidth - margin)
+    );
+    const top = Math.min(
+      event.clientY + 16,
+      Math.max(margin, window.innerHeight - popoverHeight - margin)
+    );
+
+    setDamagePopover({ rowIndex, x: left, y: top });
+  };
+
+  const renderMitigationPopover = () => {
+    if (!damagePopover) {
+      return null;
+    }
+
+    const row = rows[damagePopover.rowIndex];
+    const moment = row?.line.moment;
+    if (!row || !moment) {
+      return null;
+    }
+
+    const summary = rowMitigationSummaries[damagePopover.rowIndex];
+    const effects = summary?.effects ?? [];
+    const totalMitigation = summary?.immune
+      ? "無効"
+      : summary
+        ? formatPct(summary.mitigationPct)
+        : "0%";
+    const hitTaken =
+      typeof moment.damage === "number"
+        ? summary?.hitTaken ?? moment.damage
+        : undefined;
+    const dotTaken =
+      typeof moment.dot === "number"
+        ? summary?.dotTaken ?? moment.dot
+        : undefined;
+
+    return (
+      <div
+        className="mp-mitigation-popover"
+        style={{
+          left: damagePopover.x,
+          top: damagePopover.y,
+        }}
+      >
+        <div className="mp-mitigation-popover-title">
+          {formatSec(row.sec)} {row.line.label || "ダメージ"}
+        </div>
+        <div className="mp-mitigation-popover-grid">
+          {typeof moment.damage === "number" && (
+            <>
+              <span>元ダメージ</span>
+              <strong>{formatNumber(moment.damage)}</strong>
+              <span>軽減後</span>
+              <strong>{formatNumber(hitTaken)}</strong>
+            </>
+          )}
+          {typeof moment.dot === "number" && (
+            <>
+              <span>元DoT</span>
+              <strong>
+                {formatNumber(moment.dot)} x {moment.dot_ticks ?? 1}
+              </strong>
+              <span>軽減後DoT</span>
+              <strong>
+                {formatNumber(dotTaken)} x {moment.dot_ticks ?? 1}
+              </strong>
+            </>
+          )}
+          <span>合計軽減</span>
+          <strong>{totalMitigation}</strong>
+        </div>
+        <div className="mp-mitigation-popover-effects">
+          <div className="mp-mitigation-popover-section-title">適用中の軽減</div>
+          {effects.length > 0 ? (
+            <ul>
+              {effects.map((effect, index) => (
+                <li key={`${effect.skill.id}-${index}`}>
+                  <span>{effect.skill.name}</span>
+                  <strong>
+                    {effect.immune ? "無効" : formatPct(1 - effect.multiplier)}
+                  </strong>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>軽減は入っていません</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderDamageContentAtRow = (moment: Moment | undefined, rowIndex: number) => {
     if (!moment) {
       return <span className="mp-damage-none">{"\u2014"}</span>;
@@ -1439,8 +1778,15 @@ export default function TimelineGrid({
     }
 
     const chunks: JSX.Element[] = [];
-    const formatPct = (value: number) => `${(value * 100).toFixed(1)}%`;
-    const activeSkills = summary.effects.map((effect) => effect.skill.name).join(", ");
+    const formatPct = (value: number) => {
+      const pct = value * 100;
+      return Number.isInteger(pct) ? `${pct}%` : `${pct.toFixed(1)}%`;
+    };
+    const formatEffectLabel = (effect: (typeof summary.effects)[number]) =>
+      effect.immune
+        ? `${effect.skill.name}(\u7121\u52b9)`
+        : `${effect.skill.name}(${formatPct(1 - effect.multiplier)})`;
+    const activeSkills = summary.effects.map(formatEffectLabel).join(" / ");
 
     if (typeof moment.damage === "number") {
       const reducedDamage = summary.hitTaken ?? moment.damage;
@@ -1688,14 +2034,17 @@ export default function TimelineGrid({
                   : undefined;
                 const mechanismLabel = mechanismCell?.label ?? "";
                 const moment = row.line.moment;
+                const rowKey = `${row.sec}::${row.lineIndex}`;
+                const hasValidationIssue = validationRows.has(rowKey);
 
               return (
                   <tr
-                    key={`${row.sec}::${row.lineIndex}`}
+                    key={rowKey}
                     data-row-sec={row.sec}
+                    data-row-key={rowKey}
                     className={`mp-row align-top ${
                       focusSecond === row.sec ? "mp-row--focus" : ""
-                    }`}
+                    } ${hasValidationIssue ? "mp-row--validation-issue" : ""}`}
                   >
                     {hasMechanisms && mechanismCell && (
                       <td
@@ -1757,17 +2106,26 @@ export default function TimelineGrid({
                     <td
                       className="p-1 text-right mp-col-damage mp-col-freeze mp-col-freeze--last"
                       style={freezeStyle(freezeOffsets.damage)}>
-                      {renderDamageContentAtRow(moment, rowIndex)}
+                      <div
+                        className="mp-damage-popover-trigger"
+                        onMouseEnter={(event) => updateDamagePopover(rowIndex, event)}
+                        onMouseMove={(event) => updateDamagePopover(rowIndex, event)}
+                        onMouseLeave={() => setDamagePopover(null)}
+                      >
+                        {renderDamageContentAtRow(moment, rowIndex)}
+                      </div>
                     </td>
 
 
                     {cols.map((c, ci) => {
                       const isAstDraw = isAstDrawSkill(c.skill.id);
                       const isSchAetherflow = isSchAetherflowSkill(c.skill.id);
+                      const isSgeAddersgall = isSgeAddersgallSkill(c.skill.id);
                       const isWhmLily = isWhmLilySkill(c.skill.id);
                       const hasStacks =
                         !isAstDraw &&
                         !isSchAetherflow &&
+                        !isSgeAddersgall &&
                         !isWhmLily &&
                         (isChargeSkill(c.skill) ||
                           (typeof c.skill.maxStacks === "number" && c.skill.maxStacks > 0));
@@ -1789,13 +2147,29 @@ export default function TimelineGrid({
                       const whmLilyUsage = isWhmLily
                         ? usageIndex.get(`${c.jobId}::${c.skill.id}::${row.sec}::${row.lineIndex}`)
                         : undefined;
+                      const sgeAddersgallUsage = isSgeAddersgall
+                        ? usageIndex.get(`${c.jobId}::${c.skill.id}::${row.sec}::${row.lineIndex}`)
+                        : undefined;
                       const isJobStart = ci === 0 || cols[ci - 1]?.jobId !== c.jobId;
                       const isJobEnd = ci === cols.length - 1 || cols[ci + 1]?.jobId !== c.jobId;
+                      const cellKey = `${c.jobId}::${c.skill.id}::${row.sec}::${row.lineIndex}`;
+                      const validationIssue = validationIssuesByLocation.get(cellKey);
+                      const isFocusedCell =
+                        focusSecond === row.sec &&
+                        focusLineIndex === row.lineIndex &&
+                        focusSkillId === c.skill.id;
 
                       return (
                         <td
                           key={c.jobId + "::" + c.skill.id + "::" + row.sec + "::" + row.lineIndex}
-                          className={`mp-cell mp-skill-cell ${hasStacks ? "mp-skill-cell--stack" : ""} ${isJobStart ? "mp-skill-cell--job-start" : ""} ${isJobEnd ? "mp-skill-cell--job-end" : ""}`}
+                          data-cell-key={cellKey}
+                          data-skill-id={c.skill.id}
+                          title={validationIssue?.message}
+                          className={`mp-cell mp-skill-cell ${hasStacks ? "mp-skill-cell--stack" : ""} ${isJobStart ? "mp-skill-cell--job-start" : ""} ${isJobEnd ? "mp-skill-cell--job-end" : ""} ${
+                            validationIssue
+                              ? `mp-cell--validation mp-cell--validation-${validationIssue.severity}`
+                              : ""
+                          } ${isFocusedCell ? "mp-cell--focus-target" : ""}`}
                         >
                           {isAstDraw ? (
                             <AstDrawCell
@@ -1824,6 +2198,15 @@ export default function TimelineGrid({
                               visual={gridVisual[ci][rowIndex]}
                               cycleManualUsages={schAetherflowCycleManualUsages}
                             />
+                          ) : isSgeAddersgall ? (
+                            <SgeAddersgallCell
+                              jobId={c.jobId}
+                              skill={c.skill}
+                              t={row.sec}
+                              lineIndex={row.lineIndex}
+                              visual={gridVisual[ci][rowIndex]}
+                              usage={sgeAddersgallUsage}
+                            />
                           ) : hasStacks ? (
                             <StackCell
                               jobId={c.jobId}
@@ -1851,6 +2234,7 @@ export default function TimelineGrid({
             </tbody>
           </table>
         </div>
+        {renderMitigationPopover()}
       </div>
     </div>
   );

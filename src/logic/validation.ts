@@ -6,6 +6,7 @@ import {
   WHM_AFFLATUS_MISERY_ID,
   simulateWhmLilies,
 } from "./whmLilies";
+import { simulateSgeAddersgall } from "./sgeAddersgall";
 
 export type IssueSeverity = "error" | "warning" | "info";
 
@@ -360,6 +361,49 @@ function validateWhiteMageLilies(
   return issues;
 }
 
+function validateSageAddersgall(
+  indexes: ValidationIndexes
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  for (const [jobId, jobUsages] of indexes.byJob.entries()) {
+    if (jobId !== "healer.sge" || jobUsages.length === 0) {
+      continue;
+    }
+
+    const maxSec = Math.max(...jobUsages.map((usage) => usage.t_sec), 0);
+    const simulation = simulateSgeAddersgall(jobId, jobUsages, maxSec);
+
+    for (const useSimulation of simulation.useSimulationByUsageKey.values()) {
+      if (!useSimulation.isSkillReady || useSimulation.isValid) {
+        continue;
+      }
+
+      const skill = SKILL_MAP[useSimulation.usage.skillId];
+      if (!skill) {
+        continue;
+      }
+
+      issues.push({
+        type: "resource_shortage",
+        severity: "error",
+        message: formatSageAddersgallShortageMessage(
+          skill.name,
+          useSimulation.usage.t_sec
+        ),
+        location: {
+          jobId: useSimulation.usage.jobId,
+          skillId: useSimulation.usage.skillId,
+          t_sec: useSimulation.usage.t_sec,
+          lineIndex: useSimulation.usage.lineIndex,
+        },
+      });
+    }
+  }
+
+  return issues;
+}
+
 export function validatePlan(ctx: ValidationContext): ValidationIssue[] {
   const { usages } = ctx;
 
@@ -375,8 +419,14 @@ export function validatePlan(ctx: ValidationContext): ValidationIssue[] {
   issues.push(...validateParentChildRelationships(indexes));
   issues.push(...validateScholarAetherflow(indexes));
   issues.push(...validateWhiteMageLilies(indexes));
+  issues.push(...validateSageAddersgall(indexes));
 
   return issues;
+}
+
+function formatSageAddersgallShortageMessage(skillName: string, time: number): string {
+  const t = formatTime(time);
+  return `${skillName} (${t}) はアダーガルが足りません`;
 }
 
 

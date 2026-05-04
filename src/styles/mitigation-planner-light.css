@@ -608,6 +608,95 @@ body.theme-light .mp-damage-none {
   color: #475569;
 }
 
+body.theme-light .mp-damage-popover-trigger {
+  display: inline-flex;
+  justify-content: flex-end;
+  min-width: 100%;
+  cursor: help;
+}
+
+body.theme-light .mp-mitigation-popover {
+  position: fixed;
+  z-index: 120;
+  width: min(360px, calc(100vw - 24px));
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.98));
+  box-shadow:
+    0 22px 48px rgba(15, 23, 42, 0.18),
+    0 0 24px rgba(14, 165, 233, 0.12);
+  color: #0f172a;
+  padding: 14px;
+  pointer-events: none;
+}
+
+body.theme-light .mp-mitigation-popover-title {
+  margin-bottom: 10px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+body.theme-light .mp-mitigation-popover-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px 14px;
+  border-radius: 10px;
+  background: rgba(226, 232, 240, 0.78);
+  padding: 10px;
+  font-size: 12px;
+}
+
+body.theme-light .mp-mitigation-popover-grid span {
+  color: rgba(51, 65, 85, 0.78);
+}
+
+body.theme-light .mp-mitigation-popover-grid strong {
+  color: #0369a1;
+  font-weight: 700;
+}
+
+body.theme-light .mp-mitigation-popover-effects {
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+body.theme-light .mp-mitigation-popover-section-title {
+  margin-bottom: 6px;
+  color: rgba(51, 65, 85, 0.76);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+body.theme-light .mp-mitigation-popover-effects ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.theme-light .mp-mitigation-popover-effects li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 8px;
+  background: rgba(14, 165, 233, 0.11);
+  padding: 7px 9px;
+}
+
+body.theme-light .mp-mitigation-popover-effects li strong {
+  color: #0284c7;
+  font-weight: 700;
+}
+
+body.theme-light .mp-mitigation-popover-effects p {
+  margin: 0;
+  color: rgba(51, 65, 85, 0.68);
+}
+
 body.theme-light .mp-mechanism-cell {
   position: absolute;
   inset: 0;
@@ -901,6 +990,85 @@ body.theme-light .validation-issue-icon {
 
 body.theme-light .validation-issue-message {
   flex: 1;
+}
+
+body.theme-light .validation-issue-button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+body.theme-light .validation-issue-button:disabled {
+  cursor: default;
+}
+
+body.theme-light .validation-issue-button:not(:disabled):hover .validation-issue-message {
+  text-decoration: underline;
+}
+
+body.theme-light .validation-issue-meta {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+body.theme-light .validation-issue-badge {
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  padding: 1px 6px;
+  opacity: 0.86;
+}
+
+body.theme-light .validation-issue-time {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: rgba(71, 85, 105, 0.75);
+}
+
+body.theme-light .mp-row--validation-issue td.mp-col-freeze {
+  box-shadow: inset 3px 0 0 rgba(220, 38, 38, 0.8);
+}
+
+body.theme-light .mp-cell--validation {
+  position: relative;
+}
+
+body.theme-light .mp-cell--validation::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  pointer-events: none;
+  border-radius: 5px;
+  z-index: 4;
+}
+
+body.theme-light .mp-cell--validation-error::after {
+  border: 2px solid rgba(220, 38, 38, 0.9);
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.25);
+}
+
+body.theme-light .mp-cell--validation-warning::after {
+  border: 2px solid rgba(217, 119, 6, 0.9);
+  box-shadow: 0 0 12px rgba(217, 119, 6, 0.22);
+}
+
+body.theme-light .mp-cell--focus-target::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  pointer-events: none;
+  border: 2px solid rgba(2, 132, 199, 0.95);
+  border-radius: 8px;
+  box-shadow: 0 0 18px rgba(2, 132, 199, 0.35);
+  z-index: 5;
 }
 
 /* Stack cell (click-to-cycle for stacking skills) */

@@ -621,6 +621,95 @@ td.mp-col-freeze::after {
   color: #475569;
 }
 
+.mp-damage-popover-trigger {
+  display: inline-flex;
+  justify-content: flex-end;
+  min-width: 100%;
+  cursor: help;
+}
+
+.mp-mitigation-popover {
+  position: fixed;
+  z-index: 120;
+  width: min(360px, calc(100vw - 24px));
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.98));
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, 0.42),
+    0 0 24px rgba(56, 189, 248, 0.12);
+  color: #e2e8f0;
+  padding: 14px;
+  pointer-events: none;
+}
+
+.mp-mitigation-popover-title {
+  margin-bottom: 10px;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.mp-mitigation-popover-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px 14px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.72);
+  padding: 10px;
+  font-size: 12px;
+}
+
+.mp-mitigation-popover-grid span {
+  color: rgba(203, 213, 225, 0.72);
+}
+
+.mp-mitigation-popover-grid strong {
+  color: #bae6fd;
+  font-weight: 700;
+}
+
+.mp-mitigation-popover-effects {
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.mp-mitigation-popover-section-title {
+  margin-bottom: 6px;
+  color: rgba(203, 213, 225, 0.76);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.mp-mitigation-popover-effects ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mp-mitigation-popover-effects li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.09);
+  padding: 7px 9px;
+}
+
+.mp-mitigation-popover-effects li strong {
+  color: #7dd3fc;
+  font-weight: 700;
+}
+
+.mp-mitigation-popover-effects p {
+  margin: 0;
+  color: rgba(203, 213, 225, 0.68);
+}
+
 .mp-mechanism-cell {
   position: absolute;
   inset: 0;
@@ -967,6 +1056,85 @@ td.mp-col-freeze::after {
 
 .validation-issue-message {
   flex: 1;
+}
+
+.validation-issue-button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.validation-issue-button:disabled {
+  cursor: default;
+}
+
+.validation-issue-button:not(:disabled):hover .validation-issue-message {
+  text-decoration: underline;
+}
+
+.validation-issue-meta {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.validation-issue-badge {
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  padding: 1px 6px;
+  opacity: 0.86;
+}
+
+.validation-issue-time {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: rgba(226, 232, 240, 0.75);
+}
+
+.mp-row--validation-issue td.mp-col-freeze {
+  box-shadow: inset 3px 0 0 rgba(248, 113, 113, 0.85);
+}
+
+.mp-cell--validation {
+  position: relative;
+}
+
+.mp-cell--validation::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  pointer-events: none;
+  border-radius: 5px;
+  z-index: 4;
+}
+
+.mp-cell--validation-error::after {
+  border: 2px solid rgba(248, 113, 113, 0.95);
+  box-shadow: 0 0 12px rgba(248, 113, 113, 0.35);
+}
+
+.mp-cell--validation-warning::after {
+  border: 2px solid rgba(251, 191, 36, 0.95);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.28);
+}
+
+.mp-cell--focus-target::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  pointer-events: none;
+  border: 2px solid rgba(56, 189, 248, 0.95);
+  border-radius: 8px;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.55);
+  z-index: 5;
 }
 
 /* Stack cell (click-to-cycle for stacking skills) */

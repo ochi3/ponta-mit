@@ -45,6 +45,14 @@ export default function TopBar({
     const team = useStore((s) => s.team);
     const usages = useStore((s) => s.usages);
     const timelineId = useStore((s) => s.timelineId);
+    const undo = useStore((s) => s.undo);
+    const redo = useStore((s) => s.redo);
+    const undoCount = useStore(
+        (s) => s.undoStackByTimeline[s.timelineId]?.length ?? 0
+    );
+    const redoCount = useStore(
+        (s) => s.redoStackByTimeline[s.timelineId]?.length ?? 0
+    );
     const importedTimelineState = useStore((s) => s.importedTimeline);
     const isCustomImport =
         importedTimelineState &&
@@ -195,6 +203,26 @@ export default function TopBar({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+
+                <button
+                    type="button"
+                    onClick={undo}
+                    disabled={undoCount === 0}
+                    className={copyButtonClass}
+                    title="ひとつ前の編集に戻します"
+                >
+                    戻す
+                </button>
+
+                <button
+                    type="button"
+                    onClick={redo}
+                    disabled={redoCount === 0}
+                    className={copyButtonClass}
+                    title="戻した編集をやり直します"
+                >
+                    やり直し
+                </button>
 
                 <button type="button" onClick={handleGenerateLink} className={actionButtonClass}>
                     {t("topbar.actions.generateLink")}
