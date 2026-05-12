@@ -9,7 +9,10 @@ import {
 import { secondsInPhase } from "../logic/timelineView";
 import { encodeShareUrl } from "../logic/share";
 import { parseTimelineJson } from "../logic/timelineImport";
+import { serializeTimelineJson } from "../logic/timelineExport";
 import { useStore } from "../state/store";
+import FflogsTimelineImportDialog from "./FflogsTimelineImportDialog";
+import type { FflogsTimelineImportResult } from "../logic/fflogsTimeline";
 import PhaseTabs from "./PhaseTabs";
 import TeamPicker from "./TeamPicker";
 import { useI18n, resolveIntlString } from "../i18n";
@@ -18,6 +21,16 @@ function hasPracticeConfig(
     practice?: { youtubeUrl?: string; syncPoints?: readonly unknown[] } | null
 ) {
     return Boolean(practice?.youtubeUrl?.trim() || practice?.syncPoints?.length);
+}
+
+function sanitizeDownloadFileName(value: string) {
+    return (
+        value
+            .trim()
+            .replace(/[\\/:*?"<>|]+/g, "_")
+            .replace(/\s+/g, "_")
+            .slice(0, 96) || "timeline"
+    );
 }
 
 type Props = {
@@ -41,6 +54,7 @@ export default function TopBar({
 }: Props) {
     const [shareUrl, setShareUrl] = useState("");
     const [isCopied, setIsCopied] = useState(false);
+    const [isFflogsImportOpen, setIsFflogsImportOpen] = useState(false);
     const { t } = useI18n();
     const team = useStore((s) => s.team);
     const usages = useStore((s) => s.usages);
@@ -68,6 +82,7 @@ export default function TopBar({
     const contentPractice = useStore((s) => s.practiceDefaultsByTimeline[tl.id]);
     const setImportedTimeline = useStore((s) => s.setImportedTimeline);
     const setTimelineId = useStore((s) => s.setTimeline);
+    const replaceTimelinePlan = useStore((s) => s.replaceTimelinePlan);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const isLight = theme === "light";
 
@@ -136,6 +151,34 @@ export default function TopBar({
             const msg = e instanceof Error ? e.message : String(e);
             window.alert(`Import failed: ${msg}`);
         }
+    }
+
+    function handleImportFflogsTimeline(result: FflogsTimelineImportResult) {
+        setImportedTimeline(result.timeline);
+        replaceTimelinePlan(result.timeline.id, {
+            team: result.team,
+            usages: result.usages,
+            expandedJobs: result.expandedJobs,
+        });
+        setTimelineId(result.timeline.id);
+        onPhaseSeconds(secondsInPhase(result.timeline, undefined));
+    }
+
+    function handleSaveImportedTimelineJson() {
+        if (!isCustomImport || !importedTimelineState) {
+            return;
+        }
+
+        const json = serializeTimelineJson(importedTimelineState);
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `${sanitizeDownloadFileName(importedTimelineState.id)}.json`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 0);
     }
 
     const timelineTitle = resolveIntlString(tl.title, undefined);
@@ -324,7 +367,25 @@ export default function TopBar({
             >
             {t("topbar.actions.importTimeline")}
             </button>
-            
+
+            <button
+            type="button"
+            onClick={() => setIsFflogsImportOpen(true)}
+            className={`${secondaryButtonClass} text-xs px-2 py-1`}
+            >
+            Logsから生成
+            </button>
+
+            {isCustomImport && importedTimelineState && (
+            <button
+            type="button"
+            onClick={handleSaveImportedTimelineJson}
+            className={`${secondaryButtonClass} text-xs px-2 py-1`}
+            >
+            JSON保存
+            </button>
+            )}
+
             <div className="hidden md:block h-4 w-px bg-slate-300 dark:bg-slate-600" />
 
             <div className="flex items-center gap-2">
@@ -349,5 +410,13 @@ export default function TopBar({
         </div>
 
         </div>
+        {isFflogsImportOpen && (
+            <FflogsTimelineImportDialog
+                theme={theme}
+                baseTimeline={tl}
+                onClose={() => setIsFflogsImportOpen(false)}
+                onImport={handleImportFflogsTimeline}
+            />
+        )}
     </div>
 );}

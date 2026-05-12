@@ -70,6 +70,14 @@ type Store = {
   updateUsageStacks(jobId: JobId, skillId: string, t_sec: number, lineIndex: number, stacks: number): void;
   removeUsage(jobId: JobId, skillId: string, t_sec: number, lineIndex: number): void;
   clearUsages(): void;
+  replaceTimelinePlan(
+    timelineId: string,
+    plan: {
+      team: JobId[];
+      usages: PlanUsage[];
+      expandedJobs?: JobId[];
+    }
+  ): void;
 
   removeUsageForSkill(jobId: JobId, skillId: string): void;
   setPracticeConfig(practice: TimelinePracticeConfig): void;
@@ -639,6 +647,29 @@ export const useStore = create<Store>()(
           return updateTimelineStateWithHistory(state, timelineId, {
             ...contentState,
             usages: [],
+          });
+        }),
+
+      replaceTimelinePlan: (timelineId, plan) =>
+        set((state) => {
+          const resolvedTimelineId = normalizeTimelineId(timelineId);
+          const contentState = getContentState(
+            state.plansByTimeline,
+            resolvedTimelineId
+          );
+          const nextTeam = normalizeTeam(plan.team);
+          return updateTimelineState(state, resolvedTimelineId, {
+            ...contentState,
+            team: nextTeam,
+            usages: sortUsages(plan.usages),
+            expandedJobs: normalizeExpandedJobs(plan.expandedJobs).filter((jobId) =>
+              nextTeam.includes(jobId)
+            ),
+            cardOnlyJobs: contentState.cardOnlyJobs.filter((jobId) =>
+              nextTeam.includes(jobId)
+            ),
+            practice: syncPracticeSelection(nextTeam, contentState.practice),
+            needsRemoteSave: true,
           });
         }),
 

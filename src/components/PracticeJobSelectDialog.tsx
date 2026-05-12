@@ -63,7 +63,7 @@ export default function PracticeJobSelectDialog({
                 key={jobId}
                 type="button"
                 onClick={() => onSelect(jobId)}
-                className="job-button h-auto w-auto rounded-xl border border-transparent px-3 py-3 transition hover:scale-[1.02] hover:border-sky-500"
+                className="practice-job-button rounded-xl border border-transparent px-3 py-3 transition hover:scale-[1.02] hover:border-sky-500"
                 title={label}
               >
                 <div className="flex flex-col items-center gap-2">
@@ -72,7 +72,7 @@ export default function PracticeJobSelectDialog({
                   ) : (
                     <span className="text-xs">{label}</span>
                   )}
-                  <span className="text-xs font-medium">{label}</span>
+                  <span className="practice-job-button-label text-xs font-medium">{label}</span>
                 </div>
               </button>
             );

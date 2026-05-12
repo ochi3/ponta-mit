@@ -143,3 +143,45 @@ export function buildMitigationEffect(
     immune,
   };
 }
+
+export function buildTargetMitigationEffect(
+  skill: SkillData,
+  usage: PlanUsage,
+  elem: ElementType,
+  targetJobId: string
+): ActiveMitigationEffect | null {
+  if (!isTankPersonalSkill(skill)) {
+    return buildMitigationEffect(skill, usage, elem);
+  }
+
+  if (usage.jobId !== targetJobId) {
+    return null;
+  }
+
+  if (skill.kinds.includes("shield")) {
+    return null;
+  }
+
+  if (typeof skill.block === "number" || typeof skill.parry === "number") {
+    return null;
+  }
+
+  const immune = skill.invuln === true && IMMUNE_INVULN_SKILL_IDS.has(skill.id);
+  if (skill.invuln === true && !immune) {
+    return null;
+  }
+
+  const multiplier = getMitigationMultiplier(skill, elem);
+  const hasDeterministicMitigation = multiplier < 1 || immune;
+
+  if (!hasDeterministicMitigation) {
+    return null;
+  }
+
+  return {
+    skill,
+    usage,
+    multiplier,
+    immune,
+  };
+}

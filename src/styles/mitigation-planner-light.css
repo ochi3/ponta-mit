@@ -619,6 +619,8 @@ body.theme-light .mp-mitigation-popover {
   position: fixed;
   z-index: 120;
   width: min(360px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: auto;
   border: 1px solid rgba(14, 165, 233, 0.35);
   border-radius: 14px;
   background:
@@ -662,6 +664,11 @@ body.theme-light .mp-mitigation-popover-effects {
   font-size: 12px;
 }
 
+body.theme-light .mp-mitigation-popover-tanks {
+  margin-top: 12px;
+  font-size: 12px;
+}
+
 body.theme-light .mp-mitigation-popover-section-title {
   margin-bottom: 6px;
   color: rgba(51, 65, 85, 0.76);
@@ -670,6 +677,15 @@ body.theme-light .mp-mitigation-popover-section-title {
 }
 
 body.theme-light .mp-mitigation-popover-effects ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.theme-light .mp-mitigation-popover-tanks ul {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -687,8 +703,22 @@ body.theme-light .mp-mitigation-popover-effects li {
   padding: 7px 9px;
 }
 
+body.theme-light .mp-mitigation-popover-tanks li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 8px;
+  background: rgba(34, 197, 94, 0.12);
+  padding: 7px 9px;
+}
+
 body.theme-light .mp-mitigation-popover-effects li strong {
   color: #0284c7;
+  font-weight: 700;
+}
+
+body.theme-light .mp-mitigation-popover-tanks li strong {
+  color: #047857;
   font-weight: 700;
 }
 

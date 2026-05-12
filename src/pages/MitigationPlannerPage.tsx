@@ -705,7 +705,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
                 />
               </Suspense>
 
-              <div ref={practiceTimelinePaneRef} className="min-w-0">
+              <div ref={practiceTimelinePaneRef} className="min-w-0 mp-practice-aside-pane">
                 {practiceViewMode === "icons" ? (
                   <Suspense
                     fallback={

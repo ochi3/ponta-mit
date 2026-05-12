@@ -63,6 +63,15 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    server: {
+      proxy: {
+        "/fflogs-oauth": {
+          target: "https://www.fflogs.com",
+          changeOrigin: true,
+          rewrite: (requestPath) => requestPath.replace(/^\/fflogs-oauth/, "/oauth"),
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),

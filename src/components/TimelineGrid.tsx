@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, JSX, MouseEvent } from "react";
 import { useStore } from "../state/store";
 import { JOBS } from "../data/jobs/jobs.registry";
@@ -16,6 +16,7 @@ import { getJobIcon } from "../data/jobs/jobIcons";
 import { getDamageTypeIcon } from "../data/damageTypeIcons";
 import {
   buildMitigationEffect,
+  buildTargetMitigationEffect,
   isUsageActiveAtPoint,
   summarizeMitigation,
 } from "../logic/mitigation";
@@ -249,6 +250,7 @@ export default function TimelineGrid({
 }) {
   const { t } = useI18n();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const damagePopoverRef = useRef<HTMLDivElement | null>(null);
   const team = useStore((s) => s.team);
   const setTeam = useStore((s) => s.setTeam);
   const usages = useStore((s) => s.usages);
@@ -1609,6 +1611,68 @@ export default function TimelineGrid({
     });
   }, [rows, usages, validUsageKeys]);
 
+  const tankDamageSummariesByRow = useMemo(() => {
+    const tankJobIds = visibleTeam.filter((jobId) =>
+      JOBS.find((job) => job.id === jobId)?.role === "tank"
+    );
+
+    if (tankJobIds.length === 0) {
+      return [];
+    }
+
+    const validMitigationUsages = usages.flatMap((usage) => {
+      const usageKey = `${usage.jobId}::${usage.skillId}::${usage.t_sec}::${usage.lineIndex}`;
+      if (!validUsageKeys.has(usageKey)) {
+        return [];
+      }
+
+      const skill = SKILL_MAP[usage.skillId];
+      if (!skill) {
+        return [];
+      }
+
+      if (
+        !skill.kinds.includes("mitigation") &&
+        !skill.kinds.includes("shield") &&
+        !skill.kinds.includes("invuln")
+      ) {
+        return [];
+      }
+
+      return [{ usage, skill }];
+    });
+
+    return rows.map((row) => {
+      const moment = row.line.moment;
+      if (!moment) {
+        return [];
+      }
+
+      if (typeof moment.damage !== "number" && typeof moment.dot !== "number") {
+        return [];
+      }
+
+      return tankJobIds.map((jobId) => {
+        const effects = [];
+        for (const { usage, skill } of validMitigationUsages) {
+          if (!isUsageActiveAtPoint(usage, skill, row.sec, row.lineIndex)) {
+            continue;
+          }
+
+          const effect = buildTargetMitigationEffect(skill, usage, moment.elem, jobId);
+          if (effect) {
+            effects.push(effect);
+          }
+        }
+
+        return {
+          jobId,
+          summary: summarizeMitigation(effects, moment.damage, moment.dot),
+        };
+      });
+    });
+  }, [rows, usages, validUsageKeys, visibleTeam]);
+
   const renderElementBadge = (moment?: Moment) => {
     const elem = moment?.elem ?? "none";
 
@@ -1670,19 +1734,44 @@ export default function TimelineGrid({
     event: MouseEvent<HTMLElement>
   ) => {
     const popoverWidth = 360;
-    const popoverHeight = 260;
     const margin = 12;
     const left = Math.min(
       event.clientX + 16,
       Math.max(margin, window.innerWidth - popoverWidth - margin)
     );
-    const top = Math.min(
-      event.clientY + 16,
-      Math.max(margin, window.innerHeight - popoverHeight - margin)
-    );
+    const top = Math.max(margin, event.clientY + 16);
 
     setDamagePopover({ rowIndex, x: left, y: top });
   };
+
+  useLayoutEffect(() => {
+    if (!damagePopover) {
+      return;
+    }
+
+    const popover = damagePopoverRef.current;
+    if (!popover) {
+      return;
+    }
+
+    const margin = 12;
+    const rect = popover.getBoundingClientRect();
+    const maxLeft = Math.max(margin, window.innerWidth - rect.width - margin);
+    const maxTop = Math.max(margin, window.innerHeight - rect.height - margin);
+    const nextX = Math.min(Math.max(margin, damagePopover.x), maxLeft);
+    const nextY = Math.min(Math.max(margin, damagePopover.y), maxTop);
+
+    if (nextX === damagePopover.x && nextY === damagePopover.y) {
+      return;
+    }
+
+    setDamagePopover((current) => {
+      if (!current || current.rowIndex !== damagePopover.rowIndex) {
+        return current;
+      }
+      return { ...current, x: nextX, y: nextY };
+    });
+  }, [damagePopover]);
 
   const renderMitigationPopover = () => {
     if (!damagePopover) {
@@ -1697,6 +1786,8 @@ export default function TimelineGrid({
 
     const summary = rowMitigationSummaries[damagePopover.rowIndex];
     const effects = summary?.effects ?? [];
+    const tankDamageSummaries =
+      tankDamageSummariesByRow[damagePopover.rowIndex] ?? [];
     const totalMitigation = summary?.immune
       ? "無効"
       : summary
@@ -1713,6 +1804,7 @@ export default function TimelineGrid({
 
     return (
       <div
+        ref={damagePopoverRef}
         className="mp-mitigation-popover"
         style={{
           left: damagePopover.x,
@@ -1746,6 +1838,36 @@ export default function TimelineGrid({
           <span>合計軽減</span>
           <strong>{totalMitigation}</strong>
         </div>
+        {tankDamageSummaries.length > 0 && (
+          <div className="mp-mitigation-popover-tanks">
+            <div className="mp-mitigation-popover-section-title">
+              タンク別被ダメージ
+            </div>
+            <ul>
+              {tankDamageSummaries.map(({ jobId, summary }) => {
+                const jobName = JOBS.find((job) => job.id === jobId)?.name ?? jobId;
+                const values = [];
+                if (typeof moment.damage === "number") {
+                  values.push(formatNumber(summary.hitTaken ?? moment.damage));
+                }
+                if (typeof moment.dot === "number") {
+                  values.push(
+                    `${formatNumber(summary.dotTaken ?? moment.dot)} x ${
+                      moment.dot_ticks ?? 1
+                    }`
+                  );
+                }
+
+                return (
+                  <li key={jobId}>
+                    <span>{jobName}</span>
+                    <strong>{values.join(" / ")}</strong>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         <div className="mp-mitigation-popover-effects">
           <div className="mp-mitigation-popover-section-title">適用中の軽減</div>
           {effects.length > 0 ? (
@@ -1778,28 +1900,9 @@ export default function TimelineGrid({
     }
 
     const chunks: JSX.Element[] = [];
-    const formatPct = (value: number) => {
-      const pct = value * 100;
-      return Number.isInteger(pct) ? `${pct}%` : `${pct.toFixed(1)}%`;
-    };
-    const formatEffectLabel = (effect: (typeof summary.effects)[number]) =>
-      effect.immune
-        ? `${effect.skill.name}(\u7121\u52b9)`
-        : `${effect.skill.name}(${formatPct(1 - effect.multiplier)})`;
-    const activeSkills = summary.effects.map(formatEffectLabel).join(" / ");
 
     if (typeof moment.damage === "number") {
       const reducedDamage = summary.hitTaken ?? moment.damage;
-      const hitTitle = [
-        `\u5143\u30c0\u30e1\u30fc\u30b8: ${formatNumber(moment.damage)}`,
-        `\u8efd\u6e1b\u5f8c: ${formatNumber(reducedDamage)}`,
-        summary.immune
-          ? "\u5408\u8a08\u8efd\u6e1b: \u7121\u52b9"
-          : `\u5408\u8a08\u8efd\u6e1b: ${formatPct(summary.mitigationPct)}`,
-        activeSkills ? `\u8efd\u6e1b: ${activeSkills}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
 
       chunks.push(
         <span
@@ -1807,7 +1910,6 @@ export default function TimelineGrid({
           className={`mp-damage-number ${
             summary.immune || summary.mitigationPct > 0 ? "mp-damage-number--mitigated" : ""
           }`}
-          title={hitTitle}
         >
           {formatNumber(reducedDamage)}
         </span>
@@ -1818,19 +1920,9 @@ export default function TimelineGrid({
       const dotIcon = getDamageTypeIcon("dot");
       const reducedDot = summary.dotTaken ?? moment.dot;
       const dotTicks = moment.dot_ticks ?? 1;
-      const dotTitle = [
-        `\u5143DoT: ${formatNumber(moment.dot)} x ${dotTicks}`,
-        `\u8efd\u6e1b\u5f8c: ${formatNumber(reducedDot)} x ${dotTicks}`,
-        summary.immune
-          ? "\u5408\u8a08\u8efd\u6e1b: \u7121\u52b9"
-          : `\u5408\u8a08\u8efd\u6e1b: ${formatPct(summary.mitigationPct)}`,
-        activeSkills ? `\u8efd\u6e1b: ${activeSkills}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
 
       chunks.push(
-        <span key="dot" className="mp-damage-dot" title={dotTitle}>
+        <span key="dot" className="mp-damage-dot">
           {dotIcon && (
             <img
               src={dotIcon}

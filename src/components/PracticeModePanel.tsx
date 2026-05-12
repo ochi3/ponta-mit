@@ -314,7 +314,7 @@ export default function PracticeModePanel({
     : `${viewButtonClass} border-sky-500 bg-sky-500/15 text-sky-100`;
 
   return (
-    <section className={`${panelClass} p-4 xl:sticky xl:top-4`}>
+    <section className={`${panelClass} mp-practice-video-panel p-4 xl:sticky xl:top-4`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className={`text-lg font-semibold ${isLight ? "text-slate-900" : "text-slate-100"}`}>
@@ -325,6 +325,7 @@ export default function PracticeModePanel({
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="mp-practice-view-toggle flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
             onClick={() => onViewModeChange("timeline")}
@@ -339,6 +340,7 @@ export default function PracticeModePanel({
           >
             アイコン
           </button>
+          </div>
           <button type="button" onClick={onClose} className={actionButtonClass}>
             閉じる
           </button>
@@ -346,7 +348,7 @@ export default function PracticeModePanel({
       </div>
 
       <div className="mt-4 grid gap-4">
-        <div className="flex flex-wrap items-end justify-between gap-4 rounded-xl border border-slate-800/70 bg-slate-900/50 px-4 py-3">
+        <div className="mp-practice-video-status flex flex-wrap items-end justify-between gap-4 rounded-xl border border-slate-800/70 bg-slate-900/50 px-4 py-3">
           <div className="flex items-end gap-3">
             <div className="text-xs text-slate-400">
               現在位置
@@ -357,7 +359,7 @@ export default function PracticeModePanel({
           </div>
           
           {skillSnapshots.length > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="mp-practice-mini-icons flex items-center gap-2">
               {skillSnapshots.map((snapshot) => {
                 const { skill, status, remainingSec } = snapshot;
                 const skillIcon = getSkillIcon(skill.id);
@@ -410,7 +412,7 @@ export default function PracticeModePanel({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-800 bg-black">
+        <div className="mp-practice-video-frame overflow-hidden rounded-2xl border border-slate-800 bg-black">
           <div className="aspect-video min-h-[220px] w-full bg-black">
             {parsedVideo ? (
               <div ref={playerHostRef} className="h-full w-full" />
