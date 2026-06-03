@@ -20,6 +20,7 @@ function cleanMoment(moment: Moment): Moment {
     ...(moment.alt_group ? { alt_group: moment.alt_group } : {}),
     name: moment.name,
     elem: moment.elem,
+    ...(moment.tags?.length ? { tags: moment.tags } : {}),
     ...(hasDamage ? { damage: moment.damage } : {}),
     ...(hasDot ? { dot: moment.dot } : {}),
     ...(hasDot && moment.dot_ticks !== undefined

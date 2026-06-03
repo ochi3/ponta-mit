@@ -1,48 +1,41 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import type { Timeline } from "../types";
-import { secondsInPhase } from "../logic/timelineView";
+import { resolvePhaseScrollSec } from "../logic/timelineView";
 
 export default function PhaseTabs({
   tl,
-  onPhaseSeconds,
+  onPhaseNavigate,
 }: {
   tl: Timeline;
-  onPhaseSeconds: (secs: number[], phaseId?: string) => void;
+  onPhaseNavigate: (phaseId?: string, scrollSec?: number) => void;
 }) {
   const [active, setActive] = useState<string | undefined>(undefined);
 
-  const allSecs = useMemo(() => secondsInPhase(tl, undefined), [tl]);
-  const map = useMemo(() => {
-    const o: Record<string, number[]> = {};
-    for (const p of tl.phases) o[p.id] = secondsInPhase(tl, p.id);
-    return o;
-  }, [tl]);
-
-  function set(id?: string) {
-    setActive(id);
-    onPhaseSeconds(id ? map[id] : allSecs, id);
+  function select(phaseId?: string) {
+    setActive(phaseId);
+    onPhaseNavigate(phaseId, resolvePhaseScrollSec(tl, phaseId));
   }
 
   return (
     <div className="flex gap-2">
       <button
+        type="button"
         className={`phase-chip ${!active ? "phase-chip--active" : ""}`}
-        onClick={() => set(undefined)}
+        onClick={() => select(undefined)}
       >
         All
       </button>
 
       {tl.phases.length > 1 &&
-        tl.phases.map((p) => (
+        tl.phases.map((phase) => (
           <button
-            key={p.id}
-            className={`phase-chip ${
-              active === p.id ? "phase-chip--active" : ""
-            }`}
-            onClick={() => set(p.id)}
-            title={p.title}
+            key={phase.id}
+            type="button"
+            className={`phase-chip ${active === phase.id ? "phase-chip--active" : ""}`}
+            onClick={() => select(phase.id)}
+            title={phase.title}
           >
-            {p.id}
+            {phase.id}
           </button>
         ))}
     </div>

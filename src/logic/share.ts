@@ -57,13 +57,35 @@ function isVideoSyncPoint(x: unknown): x is VideoSyncPoint {
   return typeof point.t_sec === "number" && typeof point.video_sec === "number";
 }
 
+function isStringRecord(x: unknown): x is Record<string, string> {
+  if (!x || typeof x !== "object") return false;
+  return Object.values(x as Record<string, unknown>).every((value) => typeof value === "string");
+}
+
+function isJobVideoSourceRecord(x: unknown): x is Record<string, "base" | "job"> {
+  if (!x || typeof x !== "object") return false;
+  return Object.values(x as Record<string, unknown>).every(
+    (value) => value === "base" || value === "job"
+  );
+}
+
+function isJobSyncPointsRecord(x: unknown): boolean {
+  if (!x || typeof x !== "object") return false;
+  return Object.values(x as Record<string, unknown>).every(
+    (value) => Array.isArray(value) && value.every(isVideoSyncPoint)
+  );
+}
+
 function isPracticeConfig(x: unknown): x is TimelinePracticeConfig {
   if (!x || typeof x !== "object") return false;
   const practice = x as Record<string, unknown>;
   return (
     typeof practice.youtubeUrl === "string" &&
     Array.isArray(practice.syncPoints) &&
-    practice.syncPoints.every(isVideoSyncPoint)
+    practice.syncPoints.every(isVideoSyncPoint) &&
+    (practice.jobYoutubeUrls === undefined || isStringRecord(practice.jobYoutubeUrls)) &&
+    (practice.jobVideoSource === undefined || isJobVideoSourceRecord(practice.jobVideoSource)) &&
+    (practice.jobSyncPoints === undefined || isJobSyncPointsRecord(practice.jobSyncPoints))
   );
 }
 
@@ -85,12 +107,21 @@ function normalizeParsedPayload(raw: unknown): SharePayload | null {
     expandedJobs = o.expandedJobs as JobId[];
   }
 
+  let evolveJobs: JobId[] | undefined;
+  if (o.evolveJobs !== undefined) {
+    if (!Array.isArray(o.evolveJobs) || !o.evolveJobs.every((j) => typeof j === "string")) {
+      return null;
+    }
+    evolveJobs = o.evolveJobs as JobId[];
+  }
+
   const out: SharePayload = {
     v: o.v,
     team,
     usages,
     timelineId: typeof o.timelineId === "string" ? o.timelineId : undefined,
     expandedJobs,
+    evolveJobs,
   };
 
   if (o.practice !== undefined) {
@@ -101,6 +132,39 @@ function normalizeParsedPayload(raw: unknown): SharePayload | null {
   if (o.timelineInline !== undefined) {
     if (!isTimelineInline(o.timelineInline)) return null;
     out.timelineInline = o.timelineInline;
+  }
+
+  if (o.momentNotes !== undefined) {
+    if (!o.momentNotes || typeof o.momentNotes !== "object" || Array.isArray(o.momentNotes)) {
+      return null;
+    }
+    const momentNotes: Record<string, string> = {};
+    for (const [key, value] of Object.entries(o.momentNotes as Record<string, unknown>)) {
+      if (typeof key !== "string" || typeof value !== "string") {
+        return null;
+      }
+      momentNotes[key] = value;
+    }
+    out.momentNotes = momentNotes;
+  }
+
+  if (o.layoutPrefs !== undefined) {
+    if (!o.layoutPrefs || typeof o.layoutPrefs !== "object" || Array.isArray(o.layoutPrefs)) {
+      return null;
+    }
+    const layoutPrefs = o.layoutPrefs as Record<string, unknown>;
+    if (
+      layoutPrefs.memoWidthPx !== undefined &&
+      (typeof layoutPrefs.memoWidthPx !== "number" ||
+        !Number.isFinite(layoutPrefs.memoWidthPx))
+    ) {
+      return null;
+    }
+    out.layoutPrefs = {
+      ...(typeof layoutPrefs.memoWidthPx === "number"
+        ? { memoWidthPx: layoutPrefs.memoWidthPx }
+        : {}),
+    };
   }
 
   return out;

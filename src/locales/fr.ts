@@ -41,11 +41,23 @@ const fr = {
       mechanism: "Méca",
       time: "Temps",
       event: "Événement",
+      memo: "Note",
       element: "Type",
       damage: "Dégâts",
     },
     expand: "Plus de compétences",
     collapse: "Masquer les extras",
+    view: {
+      toolbar: "Affichage timeline",
+      showAllPersonalSkills: "Afficher les skills perso de toute l'équipe",
+      hideAllPersonalSkills: "Masquer les skills perso de toute l'équipe",
+      showAllPersonalSkillsShort: "Skills perso tous",
+      hideAllPersonalSkillsShort: "Masquer tout",
+      hideRowsWithoutEvents: "Masquer les lignes sans événement",
+      showAllRows: "Afficher toutes les lignes",
+      eventsOnlyShort: "Événements seuls",
+      eventsOnlyShortOn: "Toutes les lignes",
+    },
   },
 };
 

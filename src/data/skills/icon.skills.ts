@@ -13,10 +13,12 @@ import TANK_PLD_PASSAGE_OF_ARMS from "@/assets/icons/skills/tank.pld/passage_of_
 import TANK_PLD_SENTINEL from "@/assets/icons/skills/tank.pld/sentinel.png";
 import TANK_PLD_BULWARK from "@/assets/icons/skills/tank.pld/bulwark.png";
 import TANK_PLD_HOLY_SHELTRON from "@/assets/icons/skills/tank.pld/holy_sheltron.png";
+import TANK_PLD_INTERVENTION from "@/assets/icons/skills/tank.pld/intervention.png";
 
 import TANK_DRK_DARK_MISSIONARY from "@/assets/icons/skills/tank.drk/dark_missionary.png";
 import TANK_DRK_LIVING_DEAD from "@/assets/icons/skills/tank.drk/living_dead.png";
 import TANK_DRK_SHADOW_WALL from "@/assets/icons/skills/tank.drk/shadow_wall.png";
+import TANK_DRK_DARK_MIND from "@/assets/icons/skills/tank.drk/dark_mind.png";
 import TANK_DRK_BLACKEST_NIGHT from "@/assets/icons/skills/tank.drk/blackest_night.png";
 import TANK_DRK_OBLATION from "@/assets/icons/skills/tank.drk/oblation.png";
 
@@ -27,6 +29,7 @@ import TANK_GNB_CAMOUFLAGE from "@/assets/icons/skills/tank.gnb/camouflage.png";
 import TANK_GNB_HEART_OF_CORUNDUM from "@/assets/icons/skills/tank.gnb/heart_of_corundum.png";
 
 import MELEE_FEINT from "@/assets/icons/skills/melee/feint.png";
+import MELEE_MNK_MANTRA from "@/assets/icons/skills/melee.mnk/mantra.png";
 
 import RANGED_BRD_TROUBADOUR from "@/assets/icons/skills/ranged.brd/troubadour.png";
 import RANGED_MCH_DISMANTLE from "@/assets/icons/skills/ranged.mch/dismantle.png";
@@ -95,6 +98,10 @@ import HEALER_SGE_PANHAIMA from "@/assets/icons/skills/healer.sge/panhaima.png";
 import HEALER_SGE_HAIMA from "@/assets/icons/skills/healer.sge/haima.png";
 import HEALER_SGE_PNEUMA from "@/assets/icons/skills/healer.sge/pneuma.png";
 import HEALER_SGE_PHILOSOPHIA from "@/assets/icons/skills/healer.sge/philosophia.png";
+import HEALER_SGE_ADDERSGALL from "@/assets/icons/skills/healer.sge/addersgall.png";
+import HEALER_SGE_RHIZOMATA from "@/assets/icons/skills/healer.sge/rhizomata.png";
+import HEALER_SGE_DRUOCHOLE from "@/assets/icons/skills/healer.sge/druochole.png";
+import HEALER_SGE_IXOCHOLE from "@/assets/icons/skills/healer.sge/ixochole.png";
 import HEALER_SGE_TAUROCHOLE from "@/assets/icons/skills/healer.sge/taurochole.png";
 import HEALER_SGE_KRASIS from "@/assets/icons/skills/healer.sge/krasis.png";
 import HEALER_SGE_ZOE from "@/assets/icons/skills/healer.sge/zoe.png";
@@ -114,9 +121,11 @@ export const SKILL_ICON: Record<string, string> = {
   "tank.pld.sentinel": TANK_PLD_SENTINEL,
   "tank.pld.bulwark": TANK_PLD_BULWARK,
   "tank.pld.holy_sheltron": TANK_PLD_HOLY_SHELTRON,
+  "tank.pld.intervention": TANK_PLD_INTERVENTION,
   "tank.drk.dark_missionary": TANK_DRK_DARK_MISSIONARY,
   "tank.drk.living_dead": TANK_DRK_LIVING_DEAD,
   "tank.drk.shadow_wall": TANK_DRK_SHADOW_WALL,
+  "tank.drk.dark_mind": TANK_DRK_DARK_MIND,
   "tank.drk.blackest_night": TANK_DRK_BLACKEST_NIGHT,
   "tank.drk.oblation": TANK_DRK_OBLATION,
   "tank.gnb.heart_of_light": TANK_GNB_HEART_OF_LIGHT,
@@ -125,6 +134,7 @@ export const SKILL_ICON: Record<string, string> = {
   "tank.gnb.camouflage": TANK_GNB_CAMOUFLAGE,
   "tank.gnb.heart_of_corundum": TANK_GNB_HEART_OF_CORUNDUM,
   "melee.feint": MELEE_FEINT,
+  "melee.mnk.mantra": MELEE_MNK_MANTRA,
   "ranged.brd.troubadour": RANGED_BRD_TROUBADOUR,
   "ranged.mch.tactician": RANGED_MCH_TACTICIAN,
   "ranged.mch.dismantle": RANGED_MCH_DISMANTLE,
@@ -184,6 +194,10 @@ export const SKILL_ICON: Record<string, string> = {
   "healer.sge.haima": HEALER_SGE_HAIMA,
   "healer.sge.pneuma": HEALER_SGE_PNEUMA,
   "healer.sge.philosophia": HEALER_SGE_PHILOSOPHIA,
+  "healer.sge.addersgall": HEALER_SGE_ADDERSGALL,
+  "healer.sge.rhizomata": HEALER_SGE_RHIZOMATA,
+  "healer.sge.druochole": HEALER_SGE_DRUOCHOLE,
+  "healer.sge.ixochole": HEALER_SGE_IXOCHOLE,
   "healer.sge.taurochole": HEALER_SGE_TAUROCHOLE,
   "healer.sge.krasis": HEALER_SGE_KRASIS,
   "healer.sge.zoe": HEALER_SGE_ZOE,

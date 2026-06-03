@@ -5,11 +5,21 @@ import {
   parseYouTubeUrl,
   type YouTubePlayer,
 } from "../logic/youtube";
+import { JOBS } from "../data/jobs/jobs.registry";
+import {
+  buildEffectiveSyncPoints,
+  getJobPracticeVideoUrl,
+  getSyncPointsForTarget,
+  resolvePracticeSyncTarget,
+  resolvePracticeYoutubeUrl,
+  resolvePracticeVideoSource,
+} from "../logic/practiceVideo";
 import type {
   ThemeMode,
   TimelinePracticeConfig,
   VideoSyncPoint,
   JobId,
+  PracticeVideoSource,
 } from "../types";
 import { useStore } from "../state/store";
 import {
@@ -30,6 +40,7 @@ type Props = {
   onViewModeChange: (mode: PracticeViewMode) => void;
   onTimelineTimeChange: (timelineSec: number | null) => void;
   onVideoTimeChange: (videoSec: number | null) => void;
+  onVideoSourceChange: (source: PracticeVideoSource) => void;
 };
 
 type PlayerUiState = "idle" | "loading" | "ready" | "playing" | "paused" | "error";
@@ -42,42 +53,6 @@ const PLAYER_STATE_LABELS: Record<PlayerUiState, string> = {
   paused: "一時停止",
   error: "エラー",
 };
-
-function clampSeconds(value: number) {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-  return Math.max(0, Math.floor(value));
-}
-
-function normalizeSyncPoints(syncPoints: readonly VideoSyncPoint[]) {
-  const byTimelineSecond = new Map<number, VideoSyncPoint>();
-
-  for (const point of syncPoints) {
-    if (!Number.isFinite(point.t_sec) || !Number.isFinite(point.video_sec)) {
-      continue;
-    }
-
-    const t_sec = clampSeconds(point.t_sec);
-    const video_sec = clampSeconds(point.video_sec);
-    byTimelineSecond.set(t_sec, { t_sec, video_sec });
-  }
-
-  return Array.from(byTimelineSecond.values()).sort(
-    (a, b) => a.t_sec - b.t_sec || a.video_sec - b.video_sec
-  );
-}
-
-function buildEffectiveSyncPoints(
-  syncPoints: readonly VideoSyncPoint[],
-  fallbackVideoStartSec: number
-) {
-  const normalized = normalizeSyncPoints(syncPoints);
-  if (normalized.length > 0) {
-    return normalized;
-  }
-  return [{ t_sec: 0, video_sec: fallbackVideoStartSec }];
-}
 
 function findActiveSyncPointIndex(
   syncPoints: readonly VideoSyncPoint[],
@@ -102,24 +77,48 @@ export default function PracticeModePanel({
   onViewModeChange,
   onTimelineTimeChange,
   onVideoTimeChange,
+  onVideoSourceChange,
 }: Props) {
   const isLight = theme === "light";
   const usages = useStore((state) => state.usages);
   const expandedJobs = useStore((state) => state.expandedJobs);
+  const evolveJobs = useStore((state) => state.evolveJobs);
   
   const skillSnapshots = useMemo(() => {
     if (!primaryJobId || currentTimelineSec === null) return [];
-    return getPracticeSkillsForJob(primaryJobId, usages, expandedJobs).map((skill) =>
+    const skillMode = evolveJobs.includes(primaryJobId) ? "evolve" : "normal";
+    return getPracticeSkillsForJob(primaryJobId, usages, expandedJobs, { skillMode }).map((skill) =>
       getPracticeSkillSnapshot(primaryJobId, skill, usages, currentTimelineSec)
     );
-  }, [primaryJobId, currentTimelineSec, usages, expandedJobs]);
+  }, [primaryJobId, currentTimelineSec, usages, expandedJobs, evolveJobs]);
+  const videoSource = useMemo(
+    () => resolvePracticeVideoSource(practice, primaryJobId),
+    [practice, primaryJobId]
+  );
+  const activeYoutubeUrl = useMemo(
+    () => resolvePracticeYoutubeUrl(practice, primaryJobId, videoSource),
+    [practice, primaryJobId, videoSource]
+  );
   const parsedVideo = useMemo(
-    () => parseYouTubeUrl(practice.youtubeUrl),
-    [practice.youtubeUrl]
+    () => parseYouTubeUrl(activeYoutubeUrl),
+    [activeYoutubeUrl]
+  );
+  const jobVideoUrl = getJobPracticeVideoUrl(practice, primaryJobId);
+  const hasBaseVideo = Boolean(practice.youtubeUrl.trim());
+  const hasJobVideo = Boolean(jobVideoUrl);
+  const primaryJobName =
+    JOBS.find((job) => job.id === primaryJobId)?.name ?? primaryJobId ?? "";
+  const syncTarget = useMemo(
+    () => resolvePracticeSyncTarget(practice, primaryJobId),
+    [practice, primaryJobId]
   );
   const effectiveSyncPoints = useMemo(
-    () => buildEffectiveSyncPoints(practice.syncPoints, parsedVideo?.startSeconds ?? 0),
-    [parsedVideo?.startSeconds, practice.syncPoints]
+    () =>
+      buildEffectiveSyncPoints(
+        getSyncPointsForTarget(practice, syncTarget),
+        parsedVideo?.startSeconds ?? 0
+      ),
+    [parsedVideo?.startSeconds, practice, syncTarget]
   );
   const playerHostRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YouTubePlayer | null>(null);
@@ -205,7 +204,7 @@ export default function PracticeModePanel({
       setCurrentVideoSec(null);
       emitVideoTime(null);
       emitTimelineTime(null);
-      setPlayerState(practice.youtubeUrl.trim() ? "error" : "idle");
+      setPlayerState(activeYoutubeUrl.trim() ? "error" : "idle");
       if (playerHostRef.current) {
         playerHostRef.current.replaceChildren();
       }
@@ -290,7 +289,7 @@ export default function PracticeModePanel({
         hostElement.replaceChildren();
       }
     };
-  }, [parsedVideo, practice.youtubeUrl, syncFromPlayer, emitVideoTime, emitTimelineTime]);
+  }, [activeYoutubeUrl, parsedVideo, syncFromPlayer, emitVideoTime, emitTimelineTime]);
 
   useEffect(() => {
     syncFromPlayer();
@@ -313,6 +312,8 @@ export default function PracticeModePanel({
     ? `${viewButtonClass} border-sky-500 bg-sky-100 text-sky-900`
     : `${viewButtonClass} border-sky-500 bg-sky-500/15 text-sky-100`;
 
+  const disabledViewButtonClass = `${inactiveViewButtonClass} disabled:cursor-not-allowed disabled:opacity-40`;
+
   return (
     <section className={`${panelClass} mp-practice-video-panel p-4 xl:sticky xl:top-4`}>
       <div className="flex items-start justify-between gap-3">
@@ -326,20 +327,62 @@ export default function PracticeModePanel({
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <div className="mp-practice-view-toggle flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => onViewModeChange("timeline")}
-            className={viewMode === "timeline" ? activeViewButtonClass : inactiveViewButtonClass}
-          >
-            タイムライン
-          </button>
-          <button
-            type="button"
-            onClick={() => onViewModeChange("icons")}
-            className={viewMode === "icons" ? activeViewButtonClass : inactiveViewButtonClass}
-          >
-            アイコン
-          </button>
+            <button
+              type="button"
+              onClick={() => onViewModeChange("timeline")}
+              className={
+                viewMode === "timeline" ? activeViewButtonClass : inactiveViewButtonClass
+              }
+            >
+              タイムライン
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewModeChange("icons")}
+              className={viewMode === "icons" ? activeViewButtonClass : inactiveViewButtonClass}
+            >
+              アイコン
+            </button>
+            {primaryJobId && (hasBaseVideo || hasJobVideo) && (
+              <>
+                <span
+                  className={`mx-0.5 hidden h-5 w-px sm:inline-block ${
+                    isLight ? "bg-slate-300" : "bg-slate-600"
+                  }`}
+                  aria-hidden="true"
+                />
+                <button
+                  type="button"
+                  disabled={!hasBaseVideo}
+                  onClick={() => onVideoSourceChange("base")}
+                  className={
+                    videoSource === "base"
+                      ? activeViewButtonClass
+                      : disabledViewButtonClass
+                  }
+                  title={hasBaseVideo ? "基本の動画を再生" : "基本の動画が未設定です"}
+                >
+                  基本の動画
+                </button>
+                <button
+                  type="button"
+                  disabled={!hasJobVideo}
+                  onClick={() => onVideoSourceChange("job")}
+                  className={
+                    videoSource === "job"
+                      ? activeViewButtonClass
+                      : disabledViewButtonClass
+                  }
+                  title={
+                    hasJobVideo
+                      ? `${primaryJobName}用の動画を再生`
+                      : `${primaryJobName}用の動画が未設定です（YouTube設定から登録）`
+                  }
+                >
+                  {primaryJobName ? `${primaryJobName}の動画` : "ジョブの動画"}
+                </button>
+              </>
+            )}
           </div>
           <button type="button" onClick={onClose} className={actionButtonClass}>
             閉じる
@@ -362,7 +405,7 @@ export default function PracticeModePanel({
             <div className="mp-practice-mini-icons flex items-center gap-2">
               {skillSnapshots.map((snapshot) => {
                 const { skill, status, remainingSec } = snapshot;
-                const skillIcon = getSkillIcon(skill.id);
+                const skillIcon = getSkillIcon(skill.id) ?? skill.icon;
                 const timerLabel = remainingSec === null ? null : String(remainingSec);
                 const bgClass = status === "cooldown"
                   ? "opacity-50"

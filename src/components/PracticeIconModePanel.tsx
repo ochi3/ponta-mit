@@ -47,6 +47,7 @@ export default function PracticeIconModePanel({
   const team = useStore((state) => state.team);
   const usages = useStore((state) => state.usages);
   const expandedJobs = useStore((state) => state.expandedJobs);
+  const evolveJobs = useStore((state) => state.evolveJobs);
   const toggleJobExpand = useStore((state) => state.toggleJobExpand);
   const [cardOnlyJobIds, setCardOnlyJobIds] = useState<JobId[]>([]);
   const isLight = theme === "light";
@@ -64,26 +65,30 @@ export default function PracticeIconModePanel({
 
   const jobSections = useMemo(
     () =>
-      jobIds.map((jobId) => ({
-        jobId,
-        jobName: getJobLabel(jobId),
-        jobIcon: getJobIcon(jobId),
-        hasSecondary: hasSecondarySkills(jobId),
-        hasCards: jobId === "healer.ast",
-        personalEnabled: expandedJobs.includes(jobId),
-        cardsOnlyEnabled: cardOnlyJobIds.includes(jobId),
-        snapshots: getPracticeSkillsForJob(jobId, usages, expandedJobs, {
-          astCardMode: cardOnlyJobIds.includes(jobId)
-            ? "only"
-            : jobId === "healer.ast"
-              ? "show"
-              : "hide",
-          includeAstDraws: false,
-        }).map((skill) =>
-          getPracticeSkillSnapshot(jobId, skill, usages, currentTimelineSec)
-        ),
-      })),
-    [cardOnlyJobIds, currentTimelineSec, expandedJobs, jobIds, usages]
+      jobIds.map((jobId) => {
+        const skillMode = evolveJobs.includes(jobId) ? "evolve" : "normal";
+        return {
+          jobId,
+          jobName: getJobLabel(jobId),
+          jobIcon: getJobIcon(jobId),
+          hasSecondary: hasSecondarySkills(jobId, skillMode),
+          hasCards: jobId === "healer.ast",
+          personalEnabled: expandedJobs.includes(jobId),
+          cardsOnlyEnabled: cardOnlyJobIds.includes(jobId),
+          snapshots: getPracticeSkillsForJob(jobId, usages, expandedJobs, {
+            astCardMode: cardOnlyJobIds.includes(jobId)
+              ? "only"
+              : jobId === "healer.ast"
+                ? "show"
+                : "hide",
+            includeAstDraws: false,
+            skillMode,
+          }).map((skill) =>
+            getPracticeSkillSnapshot(jobId, skill, usages, currentTimelineSec)
+          ),
+        };
+      }),
+    [cardOnlyJobIds, currentTimelineSec, evolveJobs, expandedJobs, jobIds, usages]
   );
 
   const panelClass = isLight
@@ -204,7 +209,7 @@ export default function PracticeIconModePanel({
                 {section.snapshots.length > 0 ? (
                   <div className="mp-practice-icon-grid">
                     {section.snapshots.map(({ skill, status, remainingSec, availableCharges, chargeCapacity }) => {
-                      const icon = getSkillIcon(skill.id);
+                      const icon = getSkillIcon(skill.id) ?? skill.icon;
                       const timerLabel = remainingSec === null ? null : String(remainingSec);
                       const isCardSkill = isAstCardSkill(skill.id);
 

@@ -1,0 +1,51 @@
+{
+  "id": "new-content",
+  "title": "New Content",
+  "version": 1,
+  "phases": [
+    {
+      "id": "p1",
+      "title": "P1",
+      "start_sec": 0,
+      "end_sec": 600
+    }
+  ],
+  "moments": [
+    {
+      "t_sec": 0,
+      "name": "Event",
+      "elem": "none",
+      "kind": "event"
+    },
+    {
+      "t_sec": 2,
+      "name": "Event",
+      "elem": "none",
+      "kind": "event"
+    },
+    {
+      "t_sec": 3,
+      "name": "Event",
+      "elem": "none",
+      "kind": "event"
+    },
+    {
+      "t_sec": 4,
+      "name": "Start",
+      "elem": "none",
+      "kind": "event"
+    },
+    {
+      "t_sec": 5,
+      "name": "Event",
+      "elem": "none",
+      "kind": "event"
+    },
+    {
+      "t_sec": 10,
+      "name": "Raidwide",
+      "elem": "magic",
+      "damage": 120000
+    }
+  ]
+}

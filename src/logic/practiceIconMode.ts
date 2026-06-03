@@ -1,5 +1,5 @@
 import { getJobSkillIds, SKILL_MAP } from "../data/skills";
-import type { JobId, PlanUsage, SkillData } from "../types";
+import type { JobId, JobSkillMode, PlanUsage, SkillData } from "../types";
 import {
   AST_DRAW_CYCLE_SECONDS,
   buildAstDrawSlots,
@@ -24,6 +24,7 @@ export type PracticeSkillSnapshot = {
 export type PracticeSkillFilterOptions = {
   astCardMode?: "hide" | "show" | "only";
   includeAstDraws?: boolean;
+  skillMode?: JobSkillMode;
 };
 
 function getVisualActiveDuration(skill: SkillData) {
@@ -243,10 +244,17 @@ export function getPracticeSkillsForJob(
   expandedJobs: readonly JobId[],
   options: PracticeSkillFilterOptions = {}
 ) {
-  const visibleSkillIds = getJobSkillIds(jobId, expandedJobs.includes(jobId));
-  const usedSkillIds = usages
-    .filter((usage) => usage.jobId === jobId)
-    .map((usage) => usage.skillId);
+  const visibleSkillIds = getJobSkillIds(
+    jobId,
+    expandedJobs.includes(jobId),
+    options.skillMode ?? "normal"
+  );
+  const usedSkillIds =
+    options.skillMode === "evolve"
+      ? []
+      : usages
+          .filter((usage) => usage.jobId === jobId)
+          .map((usage) => usage.skillId);
   const orderedSkillIds = Array.from(new Set([...visibleSkillIds, ...usedSkillIds]));
 
   return orderedSkillIds

@@ -41,11 +41,23 @@ const ja = {
       mechanism: "ギミック",
       time: "時間",
       event: "イベント",
+      memo: "メモ",
       element: "属性",
       damage: "ダメージ",
     },
     expand: "個人スキル",
     collapse: "追加スキルを隠す",
+    view: {
+      toolbar: "タイムライン表示",
+      showAllPersonalSkills: "パーティ全員の個人スキルを表示",
+      hideAllPersonalSkills: "パーティ全員の個人スキルを隠す",
+      showAllPersonalSkillsShort: "個人スキル全表示",
+      hideAllPersonalSkillsShort: "個人スキル全隠す",
+      hideRowsWithoutEvents: "イベントのない行を非表示",
+      showAllRows: "すべての行を表示",
+      eventsOnlyShort: "イベントのみ",
+      eventsOnlyShortOn: "全行表示",
+    },
   },
 };
 

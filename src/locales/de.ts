@@ -41,11 +41,23 @@ const de = {
       mechanism: "Mech",
       time: "Zeit",
       event: "Ereignis",
+      memo: "Notiz",
       element: "Typ",
       damage: "Schaden",
     },
     expand: "Mehr Fähigkeiten",
     collapse: "Zusätzliche ausblenden",
+    view: {
+      toolbar: "Timeline-Ansicht",
+      showAllPersonalSkills: "Persönliche Skills für alle anzeigen",
+      hideAllPersonalSkills: "Persönliche Skills für alle ausblenden",
+      showAllPersonalSkillsShort: "Alle persönlichen",
+      hideAllPersonalSkillsShort: "Alle ausblenden",
+      hideRowsWithoutEvents: "Zeilen ohne Ereignisse ausblenden",
+      showAllRows: "Alle Zeilen anzeigen",
+      eventsOnlyShort: "Nur Ereignisse",
+      eventsOnlyShortOn: "Alle Zeilen",
+    },
   },
 };
 

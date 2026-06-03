@@ -1,5 +1,15 @@
 import type { MechanismSlice, Moment, Timeline } from "../types";
 
+const MOMENT_TAGS = new Set([
+  "raidwide",
+  "tankbuster",
+  "spread",
+  "stack",
+  "tower",
+  "knockback",
+  "downtime",
+]);
+
 /** Validates moment rows (typing, damage vs event, duplicates). */
 export function validateMoments(ms: Moment[]) {
   for (const m of ms) {
@@ -8,6 +18,16 @@ export function validateMoments(ms: Moment[]) {
     }
     if (!m.elem) {
       throw new Error(`elem is required (use "none" for non-damage events): ${m.name}@${m.t_sec}`);
+    }
+    if (m.tags !== undefined) {
+      if (!Array.isArray(m.tags)) {
+        throw new Error(`tags must be an array: ${m.name}@${m.t_sec}`);
+      }
+      for (const tag of m.tags) {
+        if (!MOMENT_TAGS.has(tag)) {
+          throw new Error(`unknown tag "${tag}": ${m.name}@${m.t_sec}`);
+        }
+      }
     }
 
     const hasInstant = typeof m.damage === "number" && m.damage > 0;
@@ -24,9 +44,6 @@ export function validateMoments(ms: Moment[]) {
     if (isEvent) {
       if (m.damage !== undefined || m.dot !== undefined || m.dot_ticks !== undefined) {
         throw new Error(`event must not carry damage/dot fields: ${m.name}@${m.t_sec}`);
-      }
-      if (m.elem !== "none") {
-        throw new Error(`event must have elem="none": ${m.name}@${m.t_sec}`);
       }
     }
 

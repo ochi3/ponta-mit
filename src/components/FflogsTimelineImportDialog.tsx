@@ -4,11 +4,12 @@ import {
   importFflogsTimeline,
   type FflogsTimelineImportResult,
 } from "../logic/fflogsTimeline";
-import type { ThemeMode, Timeline } from "../types";
+import type { JobId, ThemeMode, Timeline } from "../types";
 
 type Props = {
   theme: ThemeMode;
   baseTimeline?: Timeline | null;
+  evolveJobs?: readonly JobId[];
   onClose: () => void;
   onImport: (result: FflogsTimelineImportResult) => void;
 };
@@ -16,6 +17,7 @@ type Props = {
 export default function FflogsTimelineImportDialog({
   theme,
   baseTimeline,
+  evolveJobs,
   onClose,
   onImport,
 }: Props) {
@@ -24,6 +26,10 @@ export default function FflogsTimelineImportDialog({
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [importMode, setImportMode] = useState<"overlay" | "generate">("overlay");
+  const [includeAutoAttacks, setIncludeAutoAttacks] = useState(true);
+  const [damageMergeWindowSec, setDamageMergeWindowSec] = useState("0");
+  const [autoAttackMergeWindowSec, setAutoAttackMergeWindowSec] = useState("1");
+  const [cooldownDedupeWindowSec, setCooldownDedupeWindowSec] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isTokenLoading, setIsTokenLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -77,12 +83,34 @@ export default function FflogsTimelineImportDialog({
         accessToken,
         baseTimeline:
           resolvedImportMode === "overlay" ? baseTimeline : undefined,
+        evolveJobs,
+        options: {
+          includeAutoAttacks,
+          damageMergeWindowSec: Number(damageMergeWindowSec || 0),
+          autoAttackMergeWindowSec: Number(autoAttackMergeWindowSec || 0),
+          cooldownDedupeWindowSec: cooldownDedupeWindowSec.trim()
+            ? Number(cooldownDedupeWindowSec)
+            : undefined,
+          unmatchedCooldownLimit: 40,
+        },
       });
       onImport(result);
-      setMessage(
-        `${result.eventCount}件の敵タイムライン、${result.cooldownUsageCount}件のCD使用を読み込みました。`
+      const unmatchedLines = result.unmatchedCooldowns.map((entry) =>
+        `- ${entry.t_sec}s ${entry.abilityName}${
+          entry.actorName ? ` / ${entry.actorName}` : ""
+        }${entry.actorJobId ? ` (${entry.actorJobId})` : ""} x${entry.count}`
       );
-      onClose();
+      setMessage(
+        [
+          `${result.eventCount}件の敵タイムライン、${result.cooldownUsageCount}件のCD使用を読み込みました。`,
+          unmatchedLines.length
+            ? `未一致のCD候補:\n${unmatchedLines.join("\n")}`
+            : "未一致のCD候補はありません。",
+        ].join("\n")
+      );
+      if (unmatchedLines.length === 0) {
+        onClose();
+      }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       setMessage(detail);
@@ -208,6 +236,54 @@ export default function FflogsTimelineImportDialog({
             </label>
             <p className={`mt-2 text-xs ${subtleClass}`}>
               既にaccess_tokenを持っている場合は、この欄へ直接貼り付けても使えます。
+            </p>
+          </section>
+
+          <section className={`${sectionClass} space-y-3 p-4`}>
+            <div className="text-sm font-medium">重複・AA調整</div>
+            <label className="flex items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={includeAutoAttacks}
+                onChange={(event) => setIncludeAutoAttacks(event.target.checked)}
+              />
+              AAをタイムラインに含める
+            </label>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="block text-sm font-medium">
+                同名ダメージまとめ秒
+                <input
+                  type="number"
+                  min="0"
+                  value={damageMergeWindowSec}
+                  onChange={(event) => setDamageMergeWindowSec(event.target.value)}
+                  className={`${inputClass} mt-2`}
+                />
+              </label>
+              <label className="block text-sm font-medium">
+                AAまとめ秒
+                <input
+                  type="number"
+                  min="0"
+                  value={autoAttackMergeWindowSec}
+                  onChange={(event) => setAutoAttackMergeWindowSec(event.target.value)}
+                  className={`${inputClass} mt-2`}
+                />
+              </label>
+              <label className="block text-sm font-medium">
+                CD重複まとめ秒
+                <input
+                  type="number"
+                  min="0"
+                  value={cooldownDedupeWindowSec}
+                  onChange={(event) => setCooldownDedupeWindowSec(event.target.value)}
+                  placeholder="空欄はスキルごと"
+                  className={`${inputClass} mt-2`}
+                />
+              </label>
+            </div>
+            <p className={`text-xs ${subtleClass}`}>
+              AAや同名ダメージが二重に出る場合は、まとめ秒を1-2秒に上げてください。
             </p>
           </section>
 

@@ -45,6 +45,7 @@ export default function SkillIconPanel({
 }: Props) {
   const usages = useStore((state) => state.usages);
   const expandedJobs = useStore((state) => state.expandedJobs);
+  const evolveJobs = useStore((state) => state.evolveJobs);
   const toggleJobExpand = useStore((state) => state.toggleJobExpand);
   const isLight = theme === "light";
   const jobIds = useMemo(
@@ -57,17 +58,22 @@ export default function SkillIconPanel({
 
   const jobSections = useMemo(
     () =>
-      jobIds.map((jobId) => ({
-        jobId,
-        jobName: getJobLabel(jobId),
-        jobIcon: getJobIcon(jobId),
-        hasSecondary: hasSecondarySkills(jobId),
-        personalEnabled: expandedJobs.includes(jobId),
-        snapshots: getPracticeSkillsForJob(jobId, usages, expandedJobs).map((skill) =>
-          getPracticeSkillSnapshot(jobId, skill, usages, currentTimelineSec)
-        ),
-      })),
-    [currentTimelineSec, expandedJobs, jobIds, usages]
+      jobIds.map((jobId) => {
+        const skillMode = evolveJobs.includes(jobId) ? "evolve" : "normal";
+        return {
+          jobId,
+          jobName: getJobLabel(jobId),
+          jobIcon: getJobIcon(jobId),
+          hasSecondary: hasSecondarySkills(jobId, skillMode),
+          personalEnabled: expandedJobs.includes(jobId),
+          snapshots: getPracticeSkillsForJob(jobId, usages, expandedJobs, {
+            skillMode,
+          }).map((skill) =>
+            getPracticeSkillSnapshot(jobId, skill, usages, currentTimelineSec)
+          ),
+        };
+      }),
+    [currentTimelineSec, evolveJobs, expandedJobs, jobIds, usages]
   );
 
   const panelClass = isLight
@@ -142,7 +148,7 @@ export default function SkillIconPanel({
             <div className="grid grid-cols-4 gap-2">
               {snapshots.map((snapshot) => {
                 const { skill, status } = snapshot;
-                const skillIcon = getSkillIcon(skill.id);
+                const skillIcon = getSkillIcon(skill.id) ?? skill.icon;
                 const label = fallbackSkillLabel(skill.name);
                 const bgClass = status === "cooldown"
                   ? isLight

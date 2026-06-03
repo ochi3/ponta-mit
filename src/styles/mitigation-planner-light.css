@@ -4,10 +4,12 @@
 body.theme-light :root {
   --mp-skill-col-w: 3.0rem;   /* スキル列の幅（縮小） */
   --mp-skill-col-stack-w: 3.8rem; /* スタックスキルの幅（縮小） */
-  --mp-col-mech-w: 5.1rem;
+  --mp-col-mech-w: 4.5rem;
+  --mp-sticky-header-offset: 4.75rem;
   --mp-col-time-w: 4.25rem;
   --mp-col-event-w: 14rem;
-  --mp-col-elem-w: 3.6rem;
+  --mp-col-memo-w: 7.7rem;
+  --mp-col-elem-w: 2.35rem;
   --mp-col-dmg-w: 6.0rem;    /* ダメージ列の幅（縮小） */
 }
 
@@ -20,7 +22,7 @@ body.theme-light .mp-shell {
 
 body.theme-light .mp-wrapper {
   position: relative;
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
   overflow: auto;
   /* 画面の高さを最大限活用するように調整 */
   max-height: calc(100vh - 180px);
@@ -28,7 +30,7 @@ body.theme-light .mp-wrapper {
 
 body.theme-light .mp-table {
   width: auto;
-  border-collapse: collapse;
+  border-collapse: separate;
   border-spacing: 0;
   background: #f2f2f2;
   margin: 0 auto;
@@ -281,6 +283,34 @@ body.theme-light .mp-job-header--group {
     inset 0 -1px 0 rgba(148, 163, 184, 0.25);
 }
 
+body.theme-light .mp-job-header--evolve {
+  box-shadow:
+    inset 0 0 0 1px rgba(13, 148, 136, 0.7),
+    inset -1px 0 0 rgba(148, 163, 184, 0.4),
+    inset 0 -1px 0 rgba(148, 163, 184, 0.25);
+}
+
+body.theme-light .mp-job-header--evolve .mp-job-icon {
+  filter: saturate(1.18) brightness(1.02);
+}
+
+body.theme-light .mp-job-evolve-badge {
+  position: absolute;
+  left: 50%;
+  bottom: 0.05rem;
+  transform: translateX(-50%);
+  padding: 0 0.22rem;
+  border: 1px solid rgba(15, 118, 110, 0.34);
+  border-radius: 0.2rem;
+  background: rgba(204, 251, 241, 0.95);
+  color: #115e59;
+  font-size: 0.48rem;
+  font-weight: 800;
+  line-height: 0.75rem;
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
 body.theme-light .mp-skill-header {
   width: var(--mp-skill-col-w);
   min-width: var(--mp-skill-col-w);
@@ -489,6 +519,139 @@ body.theme-light .mp-col-event {
   width: var(--mp-col-event-w);
   min-width: var(--mp-col-event-w);
   padding-right: 1rem;
+}
+
+body.theme-light .mp-col-memo {
+  width: var(--mp-col-memo-w);
+  min-width: var(--mp-col-memo-w);
+  max-width: var(--mp-col-memo-w);
+  position: relative;
+}
+
+body.theme-light th.mp-col-memo {
+  padding-right: 0.85rem;
+}
+
+body.theme-light .mp-col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0.45rem;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 2;
+}
+
+body.theme-light .mp-col-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 18%;
+  bottom: 18%;
+  right: 1px;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.45);
+}
+
+body.theme-light .mp-col-resize-handle:hover::after,
+body.theme-light .mp-col-resize-handle:active::after {
+  background: rgba(2, 132, 199, 0.85);
+}
+
+body.theme-light .mp-moment-note-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(100, 116, 139, 0.35);
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  padding: 0.2rem 0.4rem;
+}
+
+body.theme-light .mp-moment-note-input::placeholder {
+  color: #94a3b8;
+}
+
+body.theme-light .mp-moment-note-input:focus {
+  outline: 1px solid rgba(2, 132, 199, 0.45);
+  border-color: rgba(2, 132, 199, 0.45);
+}
+
+body.theme-light .mp-event-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+body.theme-light .mp-event-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.theme-light .mp-moment-tags {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+  gap: 0.2rem;
+}
+
+body.theme-light .mp-moment-tag {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid rgba(100, 116, 139, 0.35);
+  border-radius: 0.25rem;
+  background: rgba(248, 250, 252, 0.92);
+  color: #334155;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+body.theme-light .mp-moment-tag--raidwide {
+  border-color: rgba(2, 132, 199, 0.38);
+  background: rgba(224, 242, 254, 0.95);
+  color: #075985;
+}
+
+body.theme-light .mp-moment-tag--tankbuster {
+  border-color: rgba(225, 29, 72, 0.38);
+  background: rgba(255, 228, 230, 0.95);
+  color: #9f1239;
+}
+
+body.theme-light .mp-moment-tag--spread {
+  border-color: rgba(217, 119, 6, 0.38);
+  background: rgba(254, 243, 199, 0.95);
+  color: #92400e;
+}
+
+body.theme-light .mp-moment-tag--stack {
+  border-color: rgba(124, 58, 237, 0.36);
+  background: rgba(237, 233, 254, 0.95);
+  color: #5b21b6;
+}
+
+body.theme-light .mp-moment-tag--tower {
+  border-color: rgba(5, 150, 105, 0.34);
+  background: rgba(209, 250, 229, 0.95);
+  color: #065f46;
+}
+
+body.theme-light .mp-moment-tag--knockback,
+body.theme-light .mp-moment-tag--downtime {
+  border-color: rgba(100, 116, 139, 0.34);
+  background: rgba(226, 232, 240, 0.95);
+  color: #334155;
 }
 
 body.theme-light .mp-col-element {
@@ -727,20 +890,20 @@ body.theme-light .mp-mitigation-popover-effects p {
   color: rgba(51, 65, 85, 0.68);
 }
 
+body.theme-light td.mp-col-mechanism {
+  vertical-align: top;
+  padding: 0;
+  overflow: visible;
+}
+
+body.theme-light td.mp-col-mechanism.mp-col-freeze::before,
+body.theme-light td.mp-col-mechanism.mp-col-freeze::after {
+  content: none;
+}
+
 body.theme-light .mp-mechanism-cell {
-  position: absolute;
-  inset: 0;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  padding: 0.25rem 0.5rem;
-  box-sizing: border-box;
-  gap: 0.25rem;
-  line-height: 1;
+  color: #0f172a;
+  background: #f2f2f2;
 }
 
 body.theme-light .mp-practice-skill-frame {

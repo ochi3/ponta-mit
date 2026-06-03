@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 
 function resolveBasePath(env: Record<string, string>) {
@@ -20,19 +21,21 @@ function resolveBasePath(env: Record<string, string>) {
   return "/";
 }
 
-export default defineConfig(({ mode }) => {
+const maintenancePluginPath = path.resolve(__dirname, 'devtools/maintenancePlugin.ts')
+
+export default defineConfig(async ({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const maintenancePlugins = existsSync(maintenancePluginPath)
+    ? [(await import('./devtools/maintenancePlugin')).maintenanceDevToolsPlugin()]
+    : [];
 
   return {
     base: resolveBasePath(env),
-    plugins: [
-      react(),
-      tailwindcss(),
-    ],
+    plugins: [...maintenancePlugins, react(), tailwindcss()],
     build: {
       rollupOptions: {
         output: {
-          manualChunks(id) {
+          manualChunks(id: string) {
             const normalizedId = id.replace(/\\/g, "/");
 
             if (!normalizedId.includes("node_modules")) {
@@ -68,7 +71,7 @@ export default defineConfig(({ mode }) => {
         "/fflogs-oauth": {
           target: "https://www.fflogs.com",
           changeOrigin: true,
-          rewrite: (requestPath) => requestPath.replace(/^\/fflogs-oauth/, "/oauth"),
+          rewrite: (requestPath: string) => requestPath.replace(/^\/fflogs-oauth/, "/oauth"),
         },
       },
     },

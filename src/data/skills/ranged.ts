@@ -5,7 +5,8 @@ export const SKILLS_RANGED_BRD = [
   {
     id: "ranged.brd.troubadour",
     name: "トルバドゥール",
-    cooldown_s: 120,
+    fflogsAliases: ["Troubadour"],
+    cooldown_s: 90,
     duration_s: 15,
     scope: "range_party",
     phys_pct: 0.85,
@@ -20,7 +21,8 @@ export const SKILLS_RANGED_MCH = [
   {
     id: "ranged.mch.tactician",
     name: "タクティシャン",
-    cooldown_s: 120,
+    fflogsAliases: ["Tactician"],
+    cooldown_s: 90,
     duration_s: 15,
     scope: "range_party",
     phys_pct: 0.85,
@@ -32,6 +34,7 @@ export const SKILLS_RANGED_MCH = [
   {
     id: "ranged.mch.dismantle",
     name: "ディスマントル",
+    fflogsAliases: ["Dismantle"],
     cooldown_s: 90,
     duration_s: 10,
     scope: "single_target",
@@ -47,7 +50,8 @@ export const SKILLS_RANGED_DNC = [
   {
     id: "ranged.dnc.shield_samba",
     name: "シールドサンバ",
-    cooldown_s: 120,
+    fflogsAliases: ["Shield Samba", "守りのサンバ"],
+    cooldown_s: 90,
     duration_s: 15,
     scope: "range_party",
     phys_pct: 0.85,
@@ -59,6 +63,7 @@ export const SKILLS_RANGED_DNC = [
   {
     id: "ranged.dnc.improvisation",
     name: "インプロビゼーション",
+    fflogsAliases: ["Improvisation"],
     cooldown_s: 120,
     duration_s: 15,
     scope: "range_party",
@@ -68,6 +73,7 @@ export const SKILLS_RANGED_DNC = [
   {
     id: "ranged.dnc.improvised_finish",
     name: "インプロビゼーション・フィニッシュ",
+    fflogsAliases: ["Improvised Finish"],
     cooldown_s: 1,
     duration_s: 30,
     shield_pct_target: 0.1,

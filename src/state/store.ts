@@ -1,7 +1,20 @@
 import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
-import { DEFAULT_TIMELINE_ID } from "../data/timelines/registry";
+import {
+  DEFAULT_TIMELINE_ID,
+  resolveTimelineId,
+} from "../data/timelines/registry";
 import { normalizeTeam } from "../config/jobPriority";
+import { buildMomentNoteKey, normalizeMomentNotes } from "../logic/momentNotes";
+import { normalizeLayoutPrefs } from "../logic/layoutPrefs";
+import {
+  filterPracticeJobFieldsForTeam,
+  hasAnyPracticeVideo,
+  normalizeJobSyncPoints,
+  normalizeJobVideoSource,
+  normalizeJobYoutubeUrls,
+  normalizeSyncPoints,
+} from "../logic/practiceVideo";
 import { getRealtimeChannelName, getRoomId, REALTIME_EVENTS, supabase } from "../logic/realtime";
 import type {
   JobId,
@@ -10,14 +23,20 @@ import type {
   SharePayload,
   TimelinePracticeConfig,
   Timeline,
+  PlannerLayoutPrefs,
   VideoSyncPoint,
+  PracticeVideoSource,
 } from "../types";
 
 type PlannerContentState = {
   team: JobId[];
   usages: PlanUsage[];
+  momentNotes: Record<string, string>;
+  layoutPrefs: PlannerLayoutPrefs;
   expandedJobs: JobId[];
   cardOnlyJobs: JobId[];
+  evolveJobs: JobId[];
+  hideRowsWithoutEvents: boolean;
   practice: PracticeSettings;
   practiceSelectedJobId: JobId | null;
   needsRemoteSave: boolean;
@@ -28,8 +47,10 @@ type PlannerHistorySnapshot = Pick<
   PlannerContentState,
   | "team"
   | "usages"
+  | "momentNotes"
   | "expandedJobs"
   | "cardOnlyJobs"
+  | "evolveJobs"
   | "practice"
   | "practiceSelectedJobId"
 >;
@@ -43,6 +64,7 @@ type PersistedStore = {
   usages?: PlanUsage[];
   expandedJobs?: JobId[];
   cardOnlyJobs?: JobId[];
+  evolveJobs?: JobId[];
 };
 
 type Store = {
@@ -52,8 +74,12 @@ type Store = {
   practiceDefaultsByTimeline: Record<string, TimelinePracticeConfig>;
   team: JobId[];
   usages: PlanUsage[];
+  momentNotes: Record<string, string>;
+  layoutPrefs: PlannerLayoutPrefs;
   expandedJobs: JobId[];
   cardOnlyJobs: JobId[];
+  evolveJobs: JobId[];
+  hideRowsWithoutEvents: boolean;
   undoStackByTimeline: Record<string, PlannerHistorySnapshot[]>;
   redoStackByTimeline: Record<string, PlannerHistorySnapshot[]>;
 
@@ -64,18 +90,24 @@ type Store = {
   removeJob(jobId: JobId): void;
   toggleJob(jobId: JobId): void;
   toggleJobExpand(jobId: JobId): void;
+  toggleAllJobExpand(): void;
   toggleJobCardOnly(jobId: JobId): void;
+  toggleJobEvolve(jobId: JobId): void;
+  toggleHideRowsWithoutEvents(): void;
 
   addUsage(jobId: JobId, skillId: string, t_sec: number, lineIndex: number, stacks?: number): void;
   updateUsageStacks(jobId: JobId, skillId: string, t_sec: number, lineIndex: number, stacks: number): void;
   removeUsage(jobId: JobId, skillId: string, t_sec: number, lineIndex: number): void;
   clearUsages(): void;
+  setMomentNote(t_sec: number, lineIndex: number, note: string): void;
+  setMemoColumnWidth(widthPx: number): void;
   replaceTimelinePlan(
     timelineId: string,
     plan: {
       team: JobId[];
       usages: PlanUsage[];
       expandedJobs?: JobId[];
+      evolveJobs?: JobId[];
     }
   ): void;
 
@@ -84,6 +116,7 @@ type Store = {
   setPracticeYoutubeUrl(youtubeUrl: string): void;
   replacePracticeSyncPoints(syncPoints: VideoSyncPoint[]): void;
   setPracticeSelectedJob(jobId: JobId | null): void;
+  setPracticeJobVideoSource(jobId: JobId, source: PracticeVideoSource): void;
 
   applySharePayload(payload: SharePayload): void;
   applyPersistedSharedState(payload: SharePayload, updatedAt?: string | null): void;
@@ -100,7 +133,7 @@ type Store = {
 type TimelineScopedStoreState = Pick<
   Store,
   "timelineId" | "plansByTimeline" | "team" | "usages" | "expandedJobs"
-  | "cardOnlyJobs"
+  | "cardOnlyJobs" | "evolveJobs"
 >;
 
 const HISTORY_LIMIT = 50;
@@ -112,7 +145,11 @@ const FALLBACK_STORAGE: StateStorage = {
 };
 
 function normalizeTimelineId(timelineId?: string | null) {
-  return timelineId?.trim() || DEFAULT_TIMELINE_ID;
+  const trimmed = timelineId?.trim();
+  if (!trimmed) {
+    return DEFAULT_TIMELINE_ID;
+  }
+  return resolveTimelineId(trimmed);
 }
 
 function sortUsages(usages: readonly PlanUsage[]) {
@@ -129,34 +166,50 @@ function normalizeCardOnlyJobs(cardOnlyJobs?: readonly JobId[]) {
     : [];
 }
 
-function normalizeSyncPoints(syncPoints?: readonly VideoSyncPoint[]) {
-  const byTimelineSecond = new Map<number, VideoSyncPoint>();
-
-  for (const point of syncPoints ?? []) {
-    if (!Number.isFinite(point.t_sec) || !Number.isFinite(point.video_sec)) {
-      continue;
-    }
-
-    const t_sec = Math.max(0, Math.floor(point.t_sec));
-    const video_sec = Math.max(0, Math.floor(point.video_sec));
-    byTimelineSecond.set(t_sec, { t_sec, video_sec });
-  }
-
-  return Array.from(byTimelineSecond.values()).sort(
-    (a, b) => a.t_sec - b.t_sec || a.video_sec - b.video_sec
-  );
+function normalizeEvolveJobs(
+  evolveJobs?: readonly JobId[],
+  team?: readonly JobId[]
+) {
+  const uniqueJobs = evolveJobs ? Array.from(new Set(evolveJobs)) : [];
+  return team ? uniqueJobs.filter((jobId) => team.includes(jobId)) : uniqueJobs;
 }
 
 function normalizePracticeSettings(
-  settings?: Partial<PracticeSettings> | null
+  settings?: Partial<PracticeSettings> | null,
+  team?: readonly JobId[]
 ): PracticeSettings {
-  return {
+  const normalized: PracticeSettings = {
     youtubeUrl: settings?.youtubeUrl?.trim() ?? "",
     syncPoints: normalizeSyncPoints(settings?.syncPoints),
     selectedJobId:
       typeof settings?.selectedJobId === "string" && settings.selectedJobId.trim()
         ? settings.selectedJobId
         : null,
+    jobYoutubeUrls: normalizeJobYoutubeUrls(settings?.jobYoutubeUrls),
+    jobVideoSource: normalizeJobVideoSource(settings?.jobVideoSource),
+    jobSyncPoints: normalizeJobSyncPoints(settings?.jobSyncPoints),
+  };
+
+  if (!team?.length) {
+    return normalized;
+  }
+
+  const filtered = filterPracticeJobFieldsForTeam(
+    {
+      youtubeUrl: normalized.youtubeUrl,
+      syncPoints: normalized.syncPoints,
+      jobYoutubeUrls: normalized.jobYoutubeUrls,
+      jobVideoSource: normalized.jobVideoSource,
+      jobSyncPoints: normalized.jobSyncPoints,
+    },
+    team
+  );
+
+  return {
+    ...normalized,
+    jobYoutubeUrls: filtered.jobYoutubeUrls,
+    jobVideoSource: filtered.jobVideoSource,
+    jobSyncPoints: filtered.jobSyncPoints,
   };
 }
 
@@ -164,7 +217,7 @@ function syncPracticeSelection(
   team: readonly JobId[],
   practice?: Partial<PracticeSettings> | null
 ) {
-  const normalizedPractice = normalizePracticeSettings(practice);
+  const normalizedPractice = normalizePracticeSettings(practice, team);
   if (normalizedPractice.selectedJobId && team.includes(normalizedPractice.selectedJobId)) {
     return normalizedPractice;
   }
@@ -176,25 +229,55 @@ function syncPracticeSelection(
 }
 
 function toTimelinePracticeConfig(practice: PracticeSettings): TimelinePracticeConfig {
-  return {
+  const jobYoutubeUrls = normalizeJobYoutubeUrls(practice.jobYoutubeUrls);
+  const jobVideoSource = normalizeJobVideoSource(practice.jobVideoSource);
+  const jobSyncPoints = normalizeJobSyncPoints(practice.jobSyncPoints);
+  const config: TimelinePracticeConfig = {
     youtubeUrl: practice.youtubeUrl,
     syncPoints: practice.syncPoints,
   };
+
+  if (Object.keys(jobYoutubeUrls).length > 0) {
+    config.jobYoutubeUrls = jobYoutubeUrls;
+  }
+  if (Object.keys(jobVideoSource).length > 0) {
+    config.jobVideoSource = jobVideoSource;
+  }
+  if (Object.keys(jobSyncPoints).length > 0) {
+    config.jobSyncPoints = jobSyncPoints;
+  }
+
+  return config;
 }
 
 function normalizeTimelinePracticeConfig(
   practice?: Partial<TimelinePracticeConfig> | null
 ): TimelinePracticeConfig {
-  return {
+  const jobYoutubeUrls = normalizeJobYoutubeUrls(practice?.jobYoutubeUrls);
+  const jobVideoSource = normalizeJobVideoSource(practice?.jobVideoSource);
+  const jobSyncPoints = normalizeJobSyncPoints(practice?.jobSyncPoints);
+  const config: TimelinePracticeConfig = {
     youtubeUrl: practice?.youtubeUrl?.trim() ?? "",
     syncPoints: normalizeSyncPoints(practice?.syncPoints),
   };
+
+  if (Object.keys(jobYoutubeUrls).length > 0) {
+    config.jobYoutubeUrls = jobYoutubeUrls;
+  }
+  if (Object.keys(jobVideoSource).length > 0) {
+    config.jobVideoSource = jobVideoSource;
+  }
+  if (Object.keys(jobSyncPoints).length > 0) {
+    config.jobSyncPoints = jobSyncPoints;
+  }
+
+  return config;
 }
 
 function hasTimelinePracticeConfig(
   practice?: Partial<TimelinePracticeConfig> | null
 ) {
-  return Boolean(practice?.youtubeUrl?.trim() || practice?.syncPoints?.length);
+  return hasAnyPracticeVideo(practice);
 }
 
 function normalizeContentState(
@@ -210,16 +293,23 @@ function normalizeContentState(
       state?.practiceSelectedJobId ??
       state?.practice?.selectedJobId ??
       base?.practiceSelectedJobId ??
-      base?.practice.selectedJobId,
+      base?.practice?.selectedJobId,
   });
 
   return {
     team,
     usages: sortUsages(merged.usages ?? []),
+    momentNotes: normalizeMomentNotes(merged.momentNotes),
+    layoutPrefs: normalizeLayoutPrefs(merged.layoutPrefs),
     expandedJobs: normalizeExpandedJobs(merged.expandedJobs),
     cardOnlyJobs: normalizeCardOnlyJobs(merged.cardOnlyJobs).filter((jobId) =>
       team.includes(jobId)
     ),
+    evolveJobs: normalizeEvolveJobs(merged.evolveJobs, team),
+    hideRowsWithoutEvents:
+      merged.hideRowsWithoutEvents ??
+      (merged as { hideOutsideMechanismRows?: boolean }).hideOutsideMechanismRows ??
+      false,
     practice,
     practiceSelectedJobId: practice.selectedJobId,
     needsRemoteSave: merged.needsRemoteSave ?? false,
@@ -240,8 +330,10 @@ function createHistorySnapshot(
   return {
     team: [...contentState.team],
     usages: contentState.usages.map((usage) => ({ ...usage })),
+    momentNotes: { ...contentState.momentNotes },
     expandedJobs: [...contentState.expandedJobs],
     cardOnlyJobs: [...contentState.cardOnlyJobs],
+    evolveJobs: [...contentState.evolveJobs],
     practice: {
       youtubeUrl: contentState.practice.youtubeUrl,
       syncPoints: contentState.practice.syncPoints.map((point) => ({ ...point })),
@@ -292,8 +384,12 @@ function updateTimelineState(
     plansByTimeline: nextPlansByTimeline,
     team: normalizedContentState.team,
     usages: normalizedContentState.usages,
+    momentNotes: normalizedContentState.momentNotes,
+    layoutPrefs: normalizedContentState.layoutPrefs,
     expandedJobs: normalizedContentState.expandedJobs,
     cardOnlyJobs: normalizedContentState.cardOnlyJobs,
+    evolveJobs: normalizedContentState.evolveJobs,
+    hideRowsWithoutEvents: normalizedContentState.hideRowsWithoutEvents,
   };
 }
 
@@ -350,8 +446,12 @@ function activateTimelineState(
         },
     team: currentContentState.team,
     usages: currentContentState.usages,
+    momentNotes: currentContentState.momentNotes,
+    layoutPrefs: currentContentState.layoutPrefs,
     expandedJobs: currentContentState.expandedJobs,
     cardOnlyJobs: currentContentState.cardOnlyJobs,
+    evolveJobs: currentContentState.evolveJobs,
+    hideRowsWithoutEvents: currentContentState.hideRowsWithoutEvents,
   };
 }
 
@@ -360,6 +460,25 @@ function withRemoteSaveQueued(contentState: PlannerContentState) {
     ...contentState,
     needsRemoteSave: true,
   } satisfies PlannerContentState;
+}
+
+/** 表示設定のみ更新（共有ルーム／Supabase には送らない） */
+function updateTimelineDisplayPrefs(
+  state: Store,
+  timelineId: string,
+  prefs: Partial<
+    Pick<
+      PlannerContentState,
+      "expandedJobs" | "cardOnlyJobs" | "evolveJobs" | "hideRowsWithoutEvents"
+    >
+  >
+) {
+  const normalizedTimelineId = normalizeTimelineId(timelineId);
+  const contentState = getContentState(state.plansByTimeline, normalizedTimelineId);
+  return updateTimelineState(state, normalizedTimelineId, {
+    ...contentState,
+    ...prefs,
+  });
 }
 
 function broadcast(event: string, payload: unknown, timelineId: string) {
@@ -374,13 +493,17 @@ function broadcast(event: string, payload: unknown, timelineId: string) {
   });
 }
 
-function broadcastSyncState(contentState: PlannerHistorySnapshot, timelineId: string) {
+function broadcastSyncState(contentState: PlannerContentState, timelineId: string) {
   broadcast(
     REALTIME_EVENTS.SYNC_STATE,
     {
       team: contentState.team,
       usages: contentState.usages,
-      expandedJobs: contentState.expandedJobs,
+      momentNotes: contentState.momentNotes,
+      layoutPrefs:
+        contentState.layoutPrefs.memoWidthPx !== undefined
+          ? contentState.layoutPrefs
+          : undefined,
       practice: toTimelinePracticeConfig(contentState.practice),
     },
     timelineId
@@ -398,7 +521,12 @@ function mergePersistedState(
   for (const [timelineId, contentState] of Object.entries(
     persistedState.plansByTimeline ?? {}
   )) {
-    migratedPlans[normalizeTimelineId(timelineId)] = normalizeContentState(contentState);
+    const normalizedId = normalizeTimelineId(timelineId);
+    const existing = migratedPlans[normalizedId];
+    migratedPlans[normalizedId] = normalizeContentState(
+      contentState,
+      existing
+    );
   }
 
   const practiceDefaultsByTimeline = Object.fromEntries(
@@ -414,7 +542,8 @@ function mergePersistedState(
     persistedState.team !== undefined ||
     persistedState.usages !== undefined ||
     persistedState.expandedJobs !== undefined ||
-    persistedState.cardOnlyJobs !== undefined
+    persistedState.cardOnlyJobs !== undefined ||
+    persistedState.evolveJobs !== undefined
   ) {
     const legacyTimelineId = normalizeTimelineId(
       persistedState.timelineId ?? currentState.timelineId
@@ -426,6 +555,7 @@ function mergePersistedState(
         usages: persistedState.usages ?? legacyBase?.usages,
         expandedJobs: persistedState.expandedJobs ?? legacyBase?.expandedJobs,
         cardOnlyJobs: persistedState.cardOnlyJobs ?? legacyBase?.cardOnlyJobs,
+        evolveJobs: persistedState.evolveJobs ?? legacyBase?.evolveJobs,
       },
       legacyBase
     );
@@ -439,7 +569,12 @@ function mergePersistedState(
   return {
     ...currentState,
     timelineId,
-    importedTimeline: persistedState.importedTimeline ?? currentState.importedTimeline,
+    importedTimeline: persistedState.importedTimeline
+      ? {
+          ...persistedState.importedTimeline,
+          id: resolveTimelineId(persistedState.importedTimeline.id),
+        }
+      : currentState.importedTimeline,
     practiceDefaultsByTimeline,
     plansByTimeline:
       timelineId in migratedPlans
@@ -450,8 +585,12 @@ function mergePersistedState(
           },
     team: activeContentState.team,
     usages: activeContentState.usages,
+    momentNotes: activeContentState.momentNotes,
+    layoutPrefs: activeContentState.layoutPrefs,
     expandedJobs: activeContentState.expandedJobs,
     cardOnlyJobs: activeContentState.cardOnlyJobs,
+    evolveJobs: activeContentState.evolveJobs,
+    hideRowsWithoutEvents: activeContentState.hideRowsWithoutEvents,
   } satisfies Store;
 }
 
@@ -466,8 +605,12 @@ export const useStore = create<Store>()(
       },
       team: [],
       usages: [],
+      momentNotes: {},
+      layoutPrefs: {},
       expandedJobs: [],
       cardOnlyJobs: [],
+      evolveJobs: [],
+      hideRowsWithoutEvents: false,
       undoStackByTimeline: {},
       redoStackByTimeline: {},
 
@@ -543,9 +686,31 @@ export const useStore = create<Store>()(
           const nextExpandedJobs = contentState.expandedJobs.includes(jobId)
             ? contentState.expandedJobs.filter((expandedJobId) => expandedJobId !== jobId)
             : [...contentState.expandedJobs, jobId];
-          return updateTimelineStateWithHistory(state, timelineId, {
-            ...contentState,
+          return updateTimelineDisplayPrefs(state, timelineId, {
             expandedJobs: nextExpandedJobs,
+          });
+        }),
+
+      toggleAllJobExpand: () =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          const targets = contentState.team;
+          const allExpanded =
+            targets.length > 0 &&
+            targets.every((jobId) => contentState.expandedJobs.includes(jobId));
+          const nextExpandedJobs = allExpanded ? [] : [...targets];
+          return updateTimelineDisplayPrefs(state, timelineId, {
+            expandedJobs: nextExpandedJobs,
+          });
+        }),
+
+      toggleHideRowsWithoutEvents: () =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          return updateTimelineDisplayPrefs(state, timelineId, {
+            hideRowsWithoutEvents: !contentState.hideRowsWithoutEvents,
           });
         }),
 
@@ -562,9 +727,25 @@ export const useStore = create<Store>()(
                   )
                 : [...contentState.cardOnlyJobs, jobId];
 
-          return updateTimelineStateWithHistory(state, timelineId, {
-            ...contentState,
+          return updateTimelineDisplayPrefs(state, timelineId, {
             cardOnlyJobs: nextCardOnlyJobs,
+          });
+        }),
+
+      toggleJobEvolve: (jobId) =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          if (!contentState.team.includes(jobId)) {
+            return {};
+          }
+
+          const nextEvolveJobs = contentState.evolveJobs.includes(jobId)
+            ? contentState.evolveJobs.filter((evolveJobId) => evolveJobId !== jobId)
+            : [...contentState.evolveJobs, jobId];
+
+          return updateTimelineDisplayPrefs(state, timelineId, {
+            evolveJobs: nextEvolveJobs,
           });
         }),
 
@@ -650,6 +831,55 @@ export const useStore = create<Store>()(
           });
         }),
 
+      setMomentNote: (t_sec, lineIndex, note) =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          const key = buildMomentNoteKey(t_sec, lineIndex);
+          const nextNotes = { ...contentState.momentNotes };
+          if (note.length === 0) {
+            delete nextNotes[key];
+          } else {
+            nextNotes[key] = note;
+          }
+
+          const nextState = updateTimelineStateWithHistory(state, timelineId, {
+            ...contentState,
+            momentNotes: nextNotes,
+          });
+
+          broadcast(
+            REALTIME_EVENTS.SYNC_STATE,
+            { momentNotes: nextNotes },
+            timelineId
+          );
+
+          return nextState;
+        }),
+
+      setMemoColumnWidth: (widthPx) =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          const layoutPrefs = normalizeLayoutPrefs({
+            ...contentState.layoutPrefs,
+            memoWidthPx: widthPx,
+          });
+
+          const nextState = updateTimelineState(state, timelineId, {
+            ...withRemoteSaveQueued(contentState),
+            layoutPrefs,
+          });
+
+          broadcast(
+            REALTIME_EVENTS.SYNC_STATE,
+            { layoutPrefs },
+            timelineId
+          );
+
+          return nextState;
+        }),
+
       replaceTimelinePlan: (timelineId, plan) =>
         set((state) => {
           const resolvedTimelineId = normalizeTimelineId(timelineId);
@@ -664,6 +894,10 @@ export const useStore = create<Store>()(
             usages: sortUsages(plan.usages),
             expandedJobs: normalizeExpandedJobs(plan.expandedJobs).filter((jobId) =>
               nextTeam.includes(jobId)
+            ),
+            evolveJobs: normalizeEvolveJobs(
+              plan.evolveJobs ?? contentState.evolveJobs,
+              nextTeam
             ),
             cardOnlyJobs: contentState.cardOnlyJobs.filter((jobId) =>
               nextTeam.includes(jobId)
@@ -693,6 +927,9 @@ export const useStore = create<Store>()(
             ...contentState.practice,
             youtubeUrl: practice.youtubeUrl,
             syncPoints: practice.syncPoints,
+            jobYoutubeUrls: practice.jobYoutubeUrls,
+            jobVideoSource: practice.jobVideoSource,
+            jobSyncPoints: practice.jobSyncPoints,
             selectedJobId:
               contentState.practiceSelectedJobId ??
               contentState.practice.selectedJobId,
@@ -778,9 +1015,43 @@ export const useStore = create<Store>()(
           });
         }),
 
+      setPracticeJobVideoSource: (jobId, source) =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          if (!contentState.team.includes(jobId)) {
+            return {};
+          }
+
+          const nextPractice = syncPracticeSelection(contentState.team, {
+            ...contentState.practice,
+            jobVideoSource: {
+              ...contentState.practice.jobVideoSource,
+              [jobId]: source,
+            },
+          });
+          broadcast(
+            REALTIME_EVENTS.PRACTICE_UPDATED,
+            toTimelinePracticeConfig(nextPractice),
+            timelineId
+          );
+          return {
+            ...updateTimelineStateWithHistory(state, timelineId, {
+              ...contentState,
+              practice: nextPractice,
+            }),
+            practiceDefaultsByTimeline: {
+              ...state.practiceDefaultsByTimeline,
+              [timelineId]: toTimelinePracticeConfig(nextPractice),
+            },
+          };
+        }),
+
       applySharePayload: (payload) => {
         const timelineId = normalizeTimelineId(payload.timelineId ?? get().timelineId);
-        set((state) => ({
+        set((state) => {
+          const localContentState = getContentState(state.plansByTimeline, timelineId);
+          return {
           importedTimeline: null,
           practiceDefaultsByTimeline:
             payload.practice !== undefined && hasTimelinePracticeConfig(payload.practice)
@@ -795,7 +1066,26 @@ export const useStore = create<Store>()(
               ...updateTimelineState(state, timelineId, {
                 team: payload.team,
                 usages: payload.usages,
-                expandedJobs: payload.expandedJobs,
+                momentNotes:
+                  payload.momentNotes !== undefined
+                    ? normalizeMomentNotes(payload.momentNotes)
+                    : state.plansByTimeline[timelineId]?.momentNotes,
+                layoutPrefs:
+                  payload.layoutPrefs !== undefined
+                    ? normalizeLayoutPrefs(payload.layoutPrefs)
+                    : state.plansByTimeline[timelineId]?.layoutPrefs,
+                expandedJobs:
+                  payload.expandedJobs !== undefined
+                    ? normalizeExpandedJobs(payload.expandedJobs)
+                    : localContentState.expandedJobs,
+                evolveJobs:
+                  payload.evolveJobs !== undefined
+                    ? normalizeEvolveJobs(
+                        payload.evolveJobs,
+                        payload.team ?? localContentState.team
+                      )
+                    : localContentState.evolveJobs,
+                cardOnlyJobs: localContentState.cardOnlyJobs,
                 practice:
                   payload.practice !== undefined
                     ? {
@@ -808,12 +1098,15 @@ export const useStore = create<Store>()(
             },
             timelineId
           ),
-        }));
+        };
+        });
       },
 
       applyPersistedSharedState: (payload, updatedAt) => {
         const timelineId = normalizeTimelineId(payload.timelineId ?? get().timelineId);
-        set((state) => ({
+        set((state) => {
+          const localContentState = getContentState(state.plansByTimeline, timelineId);
+          return {
           practiceDefaultsByTimeline:
             payload.practice !== undefined && hasTimelinePracticeConfig(payload.practice)
               ? {
@@ -827,7 +1120,17 @@ export const useStore = create<Store>()(
               ...updateTimelineState(state, timelineId, {
                 team: payload.team,
                 usages: payload.usages,
-                expandedJobs: payload.expandedJobs,
+                momentNotes:
+                  payload.momentNotes !== undefined
+                    ? normalizeMomentNotes(payload.momentNotes)
+                    : state.plansByTimeline[timelineId]?.momentNotes,
+                layoutPrefs:
+                  payload.layoutPrefs !== undefined
+                    ? normalizeLayoutPrefs(payload.layoutPrefs)
+                    : state.plansByTimeline[timelineId]?.layoutPrefs,
+                expandedJobs: localContentState.expandedJobs,
+                cardOnlyJobs: localContentState.cardOnlyJobs,
+                evolveJobs: localContentState.evolveJobs,
                 practice:
                   payload.practice !== undefined
                     ? {
@@ -841,7 +1144,8 @@ export const useStore = create<Store>()(
             },
             timelineId
           ),
-        }));
+        };
+        });
       },
 
       markTimelineSaved: (timelineId, updatedAt) =>
@@ -870,7 +1174,17 @@ export const useStore = create<Store>()(
                 ...contentState,
                 team: syncedPayload.team ?? contentState.team,
                 usages: syncedPayload.usages ?? contentState.usages,
-                expandedJobs: syncedPayload.expandedJobs ?? contentState.expandedJobs,
+                momentNotes:
+                  syncedPayload.momentNotes !== undefined
+                    ? normalizeMomentNotes(syncedPayload.momentNotes)
+                    : contentState.momentNotes,
+                layoutPrefs:
+                  syncedPayload.layoutPrefs !== undefined
+                    ? normalizeLayoutPrefs(syncedPayload.layoutPrefs)
+                    : contentState.layoutPrefs,
+                expandedJobs: contentState.expandedJobs,
+                cardOnlyJobs: contentState.cardOnlyJobs,
+                evolveJobs: contentState.evolveJobs,
                 practice:
                   syncedPayload.practice !== undefined
                     ? {
@@ -984,16 +1298,14 @@ export const useStore = create<Store>()(
             currentSnapshot
           )[timelineId];
 
-          broadcastSyncState(previousSnapshot, timelineId);
+          const restoredState = normalizeContentState(previousSnapshot, contentState);
+          broadcastSyncState(restoredState, timelineId);
 
           return {
             ...updateTimelineState(
               state,
               timelineId,
-              withRemoteSaveQueued({
-                ...contentState,
-                ...previousSnapshot,
-              })
+              withRemoteSaveQueued(restoredState)
             ),
             undoStackByTimeline: {
               ...state.undoStackByTimeline,
@@ -1024,16 +1336,14 @@ export const useStore = create<Store>()(
             currentSnapshot
           )[timelineId];
 
-          broadcastSyncState(nextSnapshot, timelineId);
+          const restoredState = normalizeContentState(nextSnapshot, contentState);
+          broadcastSyncState(restoredState, timelineId);
 
           return {
             ...updateTimelineState(
               state,
               timelineId,
-              withRemoteSaveQueued({
-                ...contentState,
-                ...nextSnapshot,
-              })
+              withRemoteSaveQueued(restoredState)
             ),
             undoStackByTimeline: {
               ...state.undoStackByTimeline,
@@ -1062,7 +1372,11 @@ export const useStore = create<Store>()(
           {
             team: contentState.team,
             usages: contentState.usages,
-            expandedJobs: contentState.expandedJobs,
+            momentNotes: contentState.momentNotes,
+            layoutPrefs:
+              contentState.layoutPrefs.memoWidthPx !== undefined
+                ? contentState.layoutPrefs
+                : undefined,
             practice: toTimelinePracticeConfig(contentState.practice),
           },
           resolvedTimelineId
@@ -1086,11 +1400,17 @@ export const useStore = create<Store>()(
         practiceDefaultsByTimeline: state.practiceDefaultsByTimeline,
         plansByTimeline: state.plansByTimeline,
       }),
-      merge: (persistedState, currentState) =>
-        mergePersistedState(
-          persistedState as PersistedStore | undefined,
-          currentState
-        ),
+      merge: (persistedState, currentState) => {
+        try {
+          return mergePersistedState(
+            persistedState as PersistedStore | undefined,
+            currentState
+          );
+        } catch (error) {
+          console.error("[mp-planner-state] 保存データの復元に失敗しました:", error);
+          return currentState;
+        }
+      },
     }
   )
 );

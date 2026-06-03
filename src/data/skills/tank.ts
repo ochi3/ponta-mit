@@ -5,6 +5,7 @@ export const SKILLS_TANK = [
   {
     id: "tank.reprisal",
     name: "リプライザル",
+    fflogsAliases: ["Reprisal"],
     cooldown_s: 60,
     duration_s: 15,
     phys_pct: 0.9,
@@ -21,6 +22,7 @@ export const SKILLS_TANK_SECONDARY = [
   {
     id: "tank.rampart",
     name: "ランパート",
+    fflogsAliases: ["Rampart"],
     cooldown_s: 90,
     duration_s: 20,
     phys_pct: 0.8,
@@ -36,6 +38,7 @@ export const SKILLS_TANK_WAR = [
   {
     id: "tank.war.shake",
     name: "シェイクオフ",
+    fflogsAliases: ["Shake It Off"],
     cooldown_s: 90,
     duration_s: 30,
     shield_pct_target: 0.15,
@@ -46,6 +49,7 @@ export const SKILLS_TANK_WAR = [
   {
     id: "tank.war.holmgang",
     name: "ホルムギャング",
+    fflogsAliases: ["Holmgang"],
     cooldown_s: 240,
     duration_s: 10,
     scope: "self",
@@ -59,6 +63,7 @@ export const SKILLS_TANK_WAR_SECONDARY = [
   {
     id: "tank.war.damnation",
     name: "ダムネーション",
+    fflogsAliases: ["Damnation"],
     cooldown_s: 120,
     duration_s: 15,
     phys_pct: 0.6,
@@ -71,6 +76,7 @@ export const SKILLS_TANK_WAR_SECONDARY = [
   {
     id: "tank.war.bloodwhetting",
     name: "原初の血気",
+    fflogsAliases: ["Bloodwhetting"],
     cooldown_s: 25,
     duration_s: 8,
     phys_pct: 0.9,
@@ -83,6 +89,7 @@ export const SKILLS_TANK_WAR_SECONDARY = [
   {
     id: "tank.war.thrill_of_battle",
     name: "スリル・オブ・バトル",
+    fflogsAliases: ["Thrill of Battle"],
     cooldown_s: 90,
     duration_s: 10,
     scope: "self",
@@ -95,6 +102,7 @@ export const SKILLS_TANK_PLD = [
   {
     id: "tank.pld.divine_veil",
     name: "ディヴァインヴェール",
+    fflogsAliases: ["Divine Veil"],
     cooldown_s: 90,
     duration_s: 30,
     scope: "range_party",
@@ -105,6 +113,7 @@ export const SKILLS_TANK_PLD = [
   {
     id: "tank.pld.passage_of_arms",
     name: "パッセージ・オブ・アームズ",
+    fflogsAliases: ["Passage of Arms"],
     cooldown_s: 120,
     duration_s: 18,
     scope: "range_party",
@@ -117,6 +126,7 @@ export const SKILLS_TANK_PLD = [
   {
     id: "tank.pld.hallowed_ground",
     name: "インビンシブル",
+    fflogsAliases: ["Hallowed Ground"],
     cooldown_s: 420,
     duration_s: 10,
     scope: "self",
@@ -130,6 +140,7 @@ export const SKILLS_TANK_PLD_SECONDARY = [
   {
     id: "tank.pld.sentinel",
     name: "センチネル",
+    fflogsAliases: ["Sentinel"],
     cooldown_s: 120,
     duration_s: 15,
     phys_pct: 0.6,
@@ -142,6 +153,7 @@ export const SKILLS_TANK_PLD_SECONDARY = [
   {
     id: "tank.pld.bulwark",
     name: "ブルワーク",
+    fflogsAliases: ["Bulwark"],
     cooldown_s: 90,
     duration_s: 10,
     block: 1.0,
@@ -152,7 +164,8 @@ export const SKILLS_TANK_PLD_SECONDARY = [
   {
     id: "tank.pld.holy_sheltron",
     name: "ホーリーシェルトロン",
-    cooldown_s: 25,
+    fflogsAliases: ["Holy Sheltron"],
+    cooldown_s: 5,
     duration_s: 8,
     phys_pct: 0.85,
     magic_pct: 0.85,
@@ -161,12 +174,26 @@ export const SKILLS_TANK_PLD_SECONDARY = [
     kinds: ["mitigation"],
     icon: SKILL_ICON["tank.pld.holy_sheltron"],
   },
+  {
+    id: "tank.pld.intervention",
+    name: "インターベンション",
+    fflogsAliases: ["Intervention"],
+    cooldown_s: 10,
+    duration_s: 4,
+    scope: "single_party",
+    phys_pct: 0.8,
+    magic_pct: 0.8,
+    unique_pct: 1,
+    kinds: ["mitigation"],
+    icon: SKILL_ICON["tank.pld.intervention"],
+  },
 ] as const satisfies readonly SkillData[];
 
 export const SKILLS_TANK_DRK = [
   {
     id: "tank.drk.dark_missionary",
     name: "ダークミッショナリー",
+    fflogsAliases: ["Dark Missionary"],
     cooldown_s: 90,
     duration_s: 15,
     scope: "range_party",
@@ -179,6 +206,7 @@ export const SKILLS_TANK_DRK = [
   {
     id: "tank.drk.living_dead",
     name: "リビングデッド",
+    fflogsAliases: ["Living Dead"],
     cooldown_s: 300,
     duration_s: 10,
     scope: "self",
@@ -192,6 +220,7 @@ export const SKILLS_TANK_DRK_SECONDARY = [
   {
     id: "tank.drk.shadow_wall",
     name: "シャドウウォール",
+    fflogsAliases: ["Shadow Wall"],
     cooldown_s: 120,
     duration_s: 15,
     phys_pct: 0.7,
@@ -202,8 +231,22 @@ export const SKILLS_TANK_DRK_SECONDARY = [
     icon: SKILL_ICON["tank.drk.shadow_wall"],
   },
   {
+    id: "tank.drk.dark_mind",
+    name: "ダークマインド",
+    fflogsAliases: ["Dark Mind"],
+    cooldown_s: 60,
+    duration_s: 10,
+    phys_pct: 0.9,
+    magic_pct: 0.8,
+    unique_pct: 1,
+    scope: "self",
+    kinds: ["mitigation"],
+    icon: SKILL_ICON["tank.drk.dark_mind"],
+  },
+  {
     id: "tank.drk.blackest_night",
     name: "ブラックナイト",
+    fflogsAliases: ["The Blackest Night"],
     cooldown_s: 15,
     duration_s: 7,
     shield_pct_target: 0.25,
@@ -215,6 +258,7 @@ export const SKILLS_TANK_DRK_SECONDARY = [
     id: "tank.drk.oblation",
     stack: 2,
     name: "オブレーション",
+    fflogsAliases: ["Oblation"],
     cooldown_s: 60,
     duration_s: 10,
     phys_pct: 0.9,
@@ -230,6 +274,7 @@ export const SKILLS_TANK_GNB = [
   {
     id: "tank.gnb.heart_of_light",
     name: "ハート・オブ・ライト",
+    fflogsAliases: ["Heart of Light"],
     cooldown_s: 90,
     duration_s: 15,
     scope: "range_party",
@@ -242,6 +287,7 @@ export const SKILLS_TANK_GNB = [
   {
     id: "tank.gnb.superbolide",
     name: "スーパーボライド",
+    fflogsAliases: ["Superbolide"],
     cooldown_s: 360,
     duration_s: 10,
     scope: "self",
@@ -255,6 +301,7 @@ export const SKILLS_TANK_GNB_SECONDARY = [
   {
     id: "tank.gnb.great_nebula",
     name: "大星雲",
+    fflogsAliases: ["Great Nebula", "グレートネビュラ"],
     cooldown_s: 120,
     duration_s: 15,
     phys_pct: 0.6,
@@ -267,6 +314,7 @@ export const SKILLS_TANK_GNB_SECONDARY = [
   {
     id: "tank.gnb.camouflage",
     name: "カモフラージュ",
+    fflogsAliases: ["Camouflage"],
     cooldown_s: 90,
     duration_s: 20,
     phys_pct: 0.9,
@@ -280,6 +328,7 @@ export const SKILLS_TANK_GNB_SECONDARY = [
   {
     id: "tank.gnb.heart_of_corundum",
     name: "ハート・オブ・コランダム",
+    fflogsAliases: ["Heart of Corundum"],
     cooldown_s: 25,
     duration_s: 8,
     phys_pct: 0.85,

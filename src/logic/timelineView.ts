@@ -44,3 +44,23 @@ export function secondsInPhase(tl: Timeline, phaseId?: string): number[] {
   }
   return result;
 }
+
+/** フェーズタブでジャンプする秒（All は先頭フェーズの開始秒） */
+export function resolvePhaseScrollSec(tl: Timeline, phaseId?: string): number {
+  if (phaseId) {
+    const phase = tl.phases.find((p) => p.id === phaseId);
+    if (phase) {
+      return phase.start_sec;
+    }
+  }
+
+  if (tl.phases.length > 0) {
+    return Math.min(...tl.phases.map((phase) => phase.start_sec));
+  }
+
+  if (tl.moments.length > 0) {
+    return Math.min(...tl.moments.map((moment) => moment.t_sec));
+  }
+
+  return 0;
+}

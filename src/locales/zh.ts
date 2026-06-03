@@ -41,11 +41,23 @@ const zh = {
       mechanism: "机制",
       time: "时间",
       event: "技能",
+      memo: "备注",
       element: "属性",
       damage: "伤害",
     },
     expand: "显示更多技能",
     collapse: "收起额外技能",
+    view: {
+      toolbar: "时间轴显示",
+      showAllPersonalSkills: "显示全队个人技能",
+      hideAllPersonalSkills: "隐藏全队个人技能",
+      showAllPersonalSkillsShort: "全队个人技能",
+      hideAllPersonalSkillsShort: "隐藏个人技能",
+      hideRowsWithoutEvents: "隐藏没有事件的行",
+      showAllRows: "显示所有行",
+      eventsOnlyShort: "仅事件",
+      eventsOnlyShortOn: "全部行",
+    },
   },
 };
 

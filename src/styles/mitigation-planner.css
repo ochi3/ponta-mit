@@ -4,10 +4,12 @@
 :root {
   --mp-skill-col-w: 2.5rem;   /* スキル列の幅（縮小） */
   --mp-skill-col-stack-w: 2.8rem; /* スタックスキルの幅（縮小） */
-  --mp-col-mech-w: 5.1rem;
+  --mp-col-mech-w: 4.5rem;
+  --mp-sticky-header-offset: 4.75rem;
   --mp-col-time-w: 4.25rem;
   --mp-col-event-w: 14rem;
-  --mp-col-elem-w: 3.6rem;
+  --mp-col-memo-w: 7.7rem;
+  --mp-col-elem-w: 2.35rem;
   --mp-col-dmg-w: 6.0rem;    /* ダメージ列の幅（縮小） */
 }
 
@@ -100,7 +102,8 @@
 
 .mp-table {
   width: auto;
-  border-collapse: collapse;
+  /* collapse だと rowspan + sticky でラベルがクリップされる */
+  border-collapse: separate;
   border-spacing: 0;
   background: #020617;
   margin: 0 auto;
@@ -376,6 +379,34 @@ td.mp-col-freeze::after {
     inset 0 -1px 0 rgba(148, 163, 184, 0.14);
 }
 
+.mp-job-header--evolve {
+  box-shadow:
+    inset 0 0 0 1px rgba(45, 212, 191, 0.8),
+    inset -1px 0 0 rgba(15, 23, 42, 0.75),
+    inset 0 -1px 0 rgba(148, 163, 184, 0.14);
+}
+
+.mp-job-header--evolve .mp-job-icon {
+  filter: saturate(1.22) brightness(1.08);
+}
+
+.mp-job-evolve-badge {
+  position: absolute;
+  left: 50%;
+  bottom: 0.05rem;
+  transform: translateX(-50%);
+  padding: 0 0.22rem;
+  border: 1px solid rgba(94, 234, 212, 0.75);
+  border-radius: 0.2rem;
+  background: rgba(15, 118, 110, 0.88);
+  color: #ecfeff;
+  font-size: 0.48rem;
+  font-weight: 800;
+  line-height: 0.75rem;
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
 .mp-skill-header {
   width: var(--mp-skill-col-w);
   min-width: var(--mp-skill-col-w);
@@ -584,6 +615,139 @@ td.mp-col-freeze::after {
   width: var(--mp-col-event-w);
   min-width: var(--mp-col-event-w);
   padding-right: 1rem;
+}
+
+.mp-col-memo {
+  width: var(--mp-col-memo-w);
+  min-width: var(--mp-col-memo-w);
+  max-width: var(--mp-col-memo-w);
+  position: relative;
+}
+
+th.mp-col-memo {
+  padding-right: 0.85rem;
+}
+
+.mp-col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0.45rem;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 2;
+}
+
+.mp-col-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 18%;
+  bottom: 18%;
+  right: 1px;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.45);
+}
+
+.mp-col-resize-handle:hover::after,
+.mp-col-resize-handle:active::after {
+  background: rgba(56, 189, 248, 0.85);
+}
+
+.mp-moment-note-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 0.35rem;
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  padding: 0.2rem 0.4rem;
+}
+
+.mp-moment-note-input::placeholder {
+  color: #64748b;
+}
+
+.mp-moment-note-input:focus {
+  outline: 1px solid rgba(56, 189, 248, 0.65);
+  border-color: rgba(56, 189, 248, 0.55);
+}
+
+.mp-event-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.mp-event-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-moment-tags {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+  gap: 0.2rem;
+}
+
+.mp-moment-tag {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 0.25rem;
+  background: rgba(15, 23, 42, 0.72);
+  color: #cbd5e1;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.mp-moment-tag--raidwide {
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(14, 116, 144, 0.28);
+  color: #bae6fd;
+}
+
+.mp-moment-tag--tankbuster {
+  border-color: rgba(251, 113, 133, 0.55);
+  background: rgba(159, 18, 57, 0.28);
+  color: #fecdd3;
+}
+
+.mp-moment-tag--spread {
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(146, 64, 14, 0.26);
+  color: #fde68a;
+}
+
+.mp-moment-tag--stack {
+  border-color: rgba(167, 139, 250, 0.55);
+  background: rgba(91, 33, 182, 0.28);
+  color: #ddd6fe;
+}
+
+.mp-moment-tag--tower {
+  border-color: rgba(52, 211, 153, 0.5);
+  background: rgba(6, 95, 70, 0.28);
+  color: #a7f3d0;
+}
+
+.mp-moment-tag--knockback,
+.mp-moment-tag--downtime {
+  border-color: rgba(148, 163, 184, 0.5);
+  background: rgba(51, 65, 85, 0.5);
+  color: #e2e8f0;
 }
 
 .mp-col-element {
@@ -823,20 +987,48 @@ td.mp-col-freeze::after {
   color: rgba(203, 213, 225, 0.68);
 }
 
+td.mp-col-mechanism {
+  vertical-align: top;
+  padding: 0;
+  overflow: visible;
+  height: 1px;
+}
+
+/* rowspan 背面の疑似要素は縦長になりラベルを切るため無効化 */
+td.mp-col-mechanism.mp-col-freeze::before,
+td.mp-col-mechanism.mp-col-freeze::after {
+  content: none;
+}
+
+.mp-mechanism-anchor {
+  min-height: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0.35rem 0;
+  box-sizing: border-box;
+}
+
+/* --mp-mechanism-sticky-top は画面高さ基準（TopBar 下の表領域からの offset） */
 .mp-mechanism-cell {
-  position: absolute;
-  inset: 0;
+  position: sticky;
+  top: var(--mp-mechanism-sticky-top, 12rem);
+  transform: translateY(-50%);
+  z-index: 55;
   writing-mode: vertical-rl;
   text-orientation: mixed;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  padding: 0.25rem 0.5rem;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0.35rem 0.25rem;
   box-sizing: border-box;
-  gap: 0.25rem;
-  line-height: 1;
+  line-height: 1.35;
+  text-align: center;
+  color: #e2e8f0;
+  background: #020617;
+  overflow: visible;
+  white-space: nowrap;
 }
 
 .mp-practice-icon-grid {

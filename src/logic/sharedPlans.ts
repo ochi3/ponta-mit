@@ -1,4 +1,5 @@
 import { isBuiltinTimelineId as isBuiltinTimelineKey } from "../data/timelines/registry";
+import { normalizeLayoutPrefs } from "./layoutPrefs";
 import { supabase } from "./realtime";
 import type {
   JobId,
@@ -15,6 +16,8 @@ type SharedPlanRow = {
   timeline_id: string;
   team: JobId[];
   usages: PlanUsage[];
+  moment_notes: Record<string, string> | null;
+  layout_prefs: { memoWidthPx?: number } | null;
   expanded_jobs: JobId[] | null;
   practice: TimelinePracticeConfig | null;
   timeline: Timeline | null;
@@ -52,13 +55,19 @@ function shouldPersistTimeline(timelineId: string, importedTimeline: Timeline | 
 }
 
 function toSharePayload(row: SharedPlanRow): SharePayload {
+  const momentNotes = row.moment_notes ?? undefined;
   return {
     v: 1,
     team: row.team ?? [],
     usages: row.usages ?? [],
     timelineId: row.timeline_id,
-    expandedJobs: row.expanded_jobs ?? undefined,
     practice: row.practice ?? undefined,
+    momentNotes:
+      momentNotes && Object.keys(momentNotes).length > 0 ? momentNotes : undefined,
+    layoutPrefs: (() => {
+      const prefs = normalizeLayoutPrefs(row.layout_prefs);
+      return prefs.memoWidthPx !== undefined ? prefs : undefined;
+    })(),
   };
 }
 
@@ -70,7 +79,9 @@ export async function fetchSharedPlanSnapshot(
 
   const { data, error } = await supabase
     .from(SHARED_PLANS_TABLE)
-    .select("room_id, timeline_id, team, usages, expanded_jobs, practice, timeline, updated_at")
+    .select(
+      "room_id, timeline_id, team, usages, moment_notes, layout_prefs, expanded_jobs, practice, timeline, updated_at"
+    )
     .eq("room_id", roomId)
     .eq("timeline_id", timelineId)
     .maybeSingle();
@@ -116,7 +127,8 @@ export async function saveSharedPlanSnapshot(args: {
         timeline_id: timelineId,
         team: payload.team,
         usages: payload.usages,
-        expanded_jobs: payload.expandedJobs ?? [],
+        moment_notes: payload.momentNotes ?? {},
+        layout_prefs: payload.layoutPrefs ?? {},
         practice: payload.practice ?? { youtubeUrl: "", syncPoints: [] },
         timeline: timelineToPersist,
       }

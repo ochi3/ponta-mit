@@ -13,11 +13,24 @@ import type {
   JobId,
   Timeline,
   TimelinePracticeConfig,
-  VideoSyncPoint,
+  PracticeVideoSource,
 } from "../types";
+import { JOBS } from "../data/jobs/jobs.registry";
 import { isBuiltinTimelineId } from "../data/timelines/registry";
 import { decodeShareUrl } from "../logic/share";
 import { fetchSharedPlanSnapshot, saveSharedPlanSnapshot } from "../logic/sharedPlans";
+import {
+  applySyncPointRemoval,
+  applySyncPointUpdate,
+  getSyncPointsForTarget,
+  hasAnyPracticeVideo,
+  listSyncTargetOptions,
+  normalizeJobSyncPoints,
+  normalizeJobVideoSource,
+  normalizeJobYoutubeUrls,
+  resolvePracticeSyncTarget,
+} from "../logic/practiceVideo";
+import type { PracticeSyncTarget } from "../logic/practiceVideo";
 import { secondsInPhase } from "../logic/timelineView";
 import type { ValidationIssue } from "../logic/validation";
 import { useStore } from "../state/store";
@@ -54,8 +67,32 @@ const EMPTY_PRACTICE_CONFIG: TimelinePracticeConfig = {
 type PracticeViewMode = "timeline" | "icons";
 type PracticeJobDialogMode = "primary" | "extra" | null;
 
-function hasPracticeConfig(practice?: Partial<TimelinePracticeConfig> | null) {
-  return Boolean(practice?.youtubeUrl?.trim() || practice?.syncPoints?.length);
+function mergePracticeConfig(
+  source?: Partial<TimelinePracticeConfig> | null
+): TimelinePracticeConfig | null {
+  if (!hasAnyPracticeVideo(source)) {
+    return null;
+  }
+
+  const jobYoutubeUrls = normalizeJobYoutubeUrls(source?.jobYoutubeUrls);
+  const jobVideoSource = normalizeJobVideoSource(source?.jobVideoSource);
+  const jobSyncPoints = normalizeJobSyncPoints(source?.jobSyncPoints);
+  const config: TimelinePracticeConfig = {
+    youtubeUrl: source?.youtubeUrl?.trim() ?? "",
+    syncPoints: source?.syncPoints ?? [],
+  };
+
+  if (Object.keys(jobYoutubeUrls).length > 0) {
+    config.jobYoutubeUrls = jobYoutubeUrls;
+  }
+  if (Object.keys(jobVideoSource).length > 0) {
+    config.jobVideoSource = jobVideoSource;
+  }
+  if (Object.keys(jobSyncPoints).length > 0) {
+    config.jobSyncPoints = jobSyncPoints;
+  }
+
+  return config;
 }
 
 function resolvePracticeConfig(
@@ -63,59 +100,20 @@ function resolvePracticeConfig(
   contentPractice?: Partial<TimelinePracticeConfig> | null,
   timelinePractice?: Partial<TimelinePracticeConfig> | null
 ) {
-  if (hasPracticeConfig(roomPractice)) {
-    return {
-      youtubeUrl: roomPractice?.youtubeUrl?.trim() ?? "",
-      syncPoints: roomPractice?.syncPoints ?? [],
-    } satisfies TimelinePracticeConfig;
-  }
-
-  if (hasPracticeConfig(contentPractice)) {
-    return {
-      youtubeUrl: contentPractice?.youtubeUrl?.trim() ?? "",
-      syncPoints: contentPractice?.syncPoints ?? [],
-    } satisfies TimelinePracticeConfig;
-  }
-
-  if (hasPracticeConfig(timelinePractice)) {
-    return {
-      youtubeUrl: timelinePractice?.youtubeUrl?.trim() ?? "",
-      syncPoints: timelinePractice?.syncPoints ?? [],
-    } satisfies TimelinePracticeConfig;
-  }
-
-  return EMPTY_PRACTICE_CONFIG;
-}
-
-function clampSeconds(value: number) {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-  return Math.max(0, Math.floor(value));
-}
-
-function normalizeSyncPoints(syncPoints: readonly VideoSyncPoint[]) {
-  const byTimelineSecond = new Map<number, VideoSyncPoint>();
-
-  for (const point of syncPoints) {
-    if (!Number.isFinite(point.t_sec) || !Number.isFinite(point.video_sec)) {
-      continue;
-    }
-
-    const t_sec = clampSeconds(point.t_sec);
-    const video_sec = clampSeconds(point.video_sec);
-    byTimelineSecond.set(t_sec, { t_sec, video_sec });
-  }
-
-  return Array.from(byTimelineSecond.values()).sort(
-    (a, b) => a.t_sec - b.t_sec || a.video_sec - b.video_sec
+  return (
+    mergePracticeConfig(roomPractice) ??
+    mergePracticeConfig(contentPractice) ??
+    mergePracticeConfig(timelinePractice) ??
+    EMPTY_PRACTICE_CONFIG
   );
 }
 
 export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
-  const [seconds, setSeconds] = useState<number[]>(
-    () => secondsInPhase(tl, undefined)
-  );
+  const seconds = useMemo(() => secondsInPhase(tl, undefined), [tl]);
+  const [phaseNavFocus, setPhaseNavFocus] = useState<{
+    t_sec: number;
+    requestKey: number;
+  } | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [practiceJobDialogMode, setPracticeJobDialogMode] =
@@ -128,12 +126,15 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   const [practiceViewMode, setPracticeViewMode] = useState<PracticeViewMode>("timeline");
   const [practiceExtraJobIds, setPracticeExtraJobIds] = useState<JobId[]>([]);
   const [editingSyncSecond, setEditingSyncSecond] = useState<number | null>(null);
+  const [syncTarget, setSyncTarget] = useState<PracticeSyncTarget>("base");
   const [validationFocus, setValidationFocus] = useState<{
     location: NonNullable<ValidationIssue["location"]>;
     requestKey: number;
   } | null>(null);
   const team = useStore((s) => s.team);
   const usages = useStore((s) => s.usages);
+  const momentNotes = useStore((s) => s.momentNotes);
+  const layoutPrefs = useStore((s) => s.plansByTimeline[tl.id]?.layoutPrefs);
   const expandedJobs = useStore((s) => s.expandedJobs);
   const importedTimeline = useStore((s) => s.importedTimeline);
   const roomPractice = useStore((s) => s.plansByTimeline[tl.id]?.practice);
@@ -148,6 +149,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   const setImportedTimeline = useStore((s) => s.setImportedTimeline);
   const setPracticeConfig = useStore((s) => s.setPracticeConfig);
   const setPracticeSelectedJob = useStore((s) => s.setPracticeSelectedJob);
+  const setPracticeJobVideoSource = useStore((s) => s.setPracticeJobVideoSource);
   const resetTimelineState = useStore((s) => s.resetTimelineState);
   const applySharePayload = useStore((s) => s.applySharePayload);
   const applyPersistedSharedState = useStore((s) => s.applyPersistedSharedState);
@@ -163,22 +165,36 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     [contentPractice, roomPractice, tl.practice]
   );
   const practiceSeconds = useMemo(() => secondsInPhase(tl, undefined), [tl]);
+  const syncTargetOptions = useMemo(
+    () =>
+      listSyncTargetOptions(practiceConfig, team, (jobId) => {
+        return JOBS.find((job) => job.id === jobId)?.name ?? jobId;
+      }),
+    [practiceConfig, team]
+  );
+  const visibleSyncPoints = useMemo(
+    () => getSyncPointsForTarget(practiceConfig, syncTarget),
+    [practiceConfig, syncTarget]
+  );
   const syncSeconds = useMemo(
-    () => practiceConfig.syncPoints.map((point) => point.t_sec),
-    [practiceConfig.syncPoints]
+    () => visibleSyncPoints.map((point) => point.t_sec),
+    [visibleSyncPoints]
   );
   const editingSyncPoint = useMemo(
     () =>
       editingSyncSecond === null
         ? null
-        : practiceConfig.syncPoints.find((point) => point.t_sec === editingSyncSecond) ?? null,
-    [editingSyncSecond, practiceConfig.syncPoints]
+        : visibleSyncPoints.find((point) => point.t_sec === editingSyncSecond) ?? null,
+    [editingSyncSecond, visibleSyncPoints]
   );
   const currentRoomId = getRoomId();
 
   useEffect(() => {
-    setSeconds(secondsInPhase(tl, undefined));
-  }, [tl]);
+    if (syncTargetOptions.some((option) => option.target === syncTarget)) {
+      return;
+    }
+    setSyncTarget("base");
+  }, [syncTarget, syncTargetOptions]);
 
   useEffect(() => {
     const body = document.body;
@@ -437,7 +453,11 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
               team,
               usages,
               timelineId: tl.id,
-              expandedJobs: expandedJobs.length ? expandedJobs : undefined,
+              momentNotes: Object.keys(momentNotes).length ? momentNotes : undefined,
+              layoutPrefs:
+                layoutPrefs && Object.keys(layoutPrefs).length > 0
+                  ? layoutPrefs
+                  : undefined,
               practice: practiceConfig,
             },
             importedTimeline,
@@ -458,9 +478,10 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
       window.clearTimeout(timer);
     };
   }, [
-    expandedJobs,
     importedTimeline,
     markTimelineSaved,
+    momentNotes,
+    layoutPrefs,
     needsRemoteSave,
     practiceConfig,
     team,
@@ -490,9 +511,14 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
               team: contentState.team,
               usages: contentState.usages,
               timelineId: tl.id,
-              expandedJobs: contentState.expandedJobs.length
-                ? contentState.expandedJobs
+              momentNotes: Object.keys(contentState.momentNotes).length
+                ? contentState.momentNotes
                 : undefined,
+              layoutPrefs:
+                contentState.layoutPrefs &&
+                Object.keys(contentState.layoutPrefs).length > 0
+                  ? contentState.layoutPrefs
+                  : undefined,
               practice: {
                 youtubeUrl: contentState.practice.youtubeUrl,
                 syncPoints: contentState.practice.syncPoints,
@@ -514,9 +540,25 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     };
   }, [tl.id]);
 
-  function handlePhaseSeconds(secs: number[]) {
-    setSeconds(secs);
+  function handlePhaseNavigate(_phaseId: string | undefined, scrollSec?: number) {
+    if (scrollSec === undefined) {
+      return;
+    }
+    const requestKey = Date.now();
+    setPhaseNavFocus({ t_sec: scrollSec, requestKey });
+    if (isPracticeMode) {
+      startTransition(() => {
+        setPracticeTimelineSec(scrollSec);
+      });
+    }
   }
+
+  const timelineFocusSecond =
+    validationFocus?.location.t_sec ?? phaseNavFocus?.t_sec;
+  const timelineFocusRequestKey =
+    validationFocus?.requestKey ?? phaseNavFocus?.requestKey;
+  const phaseScrollToSecond = phaseNavFocus?.t_sec;
+  const phaseScrollRequestKey = phaseNavFocus?.requestKey;
 
   function handleToggleTheme() {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
@@ -574,8 +616,22 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     setIsVideoSettingsOpen(false);
   }
 
+  function handlePracticeVideoSourceChange(source: PracticeVideoSource) {
+    if (!practiceSelectedJobId) {
+      return;
+    }
+    setPracticeJobVideoSource(practiceSelectedJobId, source);
+  }
+
   function handleTimeClick(sec: number) {
+    if (isPracticeMode && practiceSelectedJobId) {
+      setSyncTarget(resolvePracticeSyncTarget(practiceConfig, practiceSelectedJobId));
+    }
     setEditingSyncSecond(sec);
+  }
+
+  function handleSyncTargetChange(target: PracticeSyncTarget) {
+    setSyncTarget(target);
   }
 
   function handleSelectValidationIssue(issue: ValidationIssue) {
@@ -594,16 +650,9 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
       return;
     }
 
-    setPracticeConfig({
-      youtubeUrl: practiceConfig.youtubeUrl,
-      syncPoints: normalizeSyncPoints([
-        ...practiceConfig.syncPoints.filter((point) => point.t_sec !== editingSyncSecond),
-        {
-          t_sec: editingSyncSecond,
-          video_sec: clampSeconds(videoSec),
-        },
-      ]),
-    });
+    setPracticeConfig(
+      applySyncPointUpdate(practiceConfig, syncTarget, editingSyncSecond, videoSec)
+    );
     setEditingSyncSecond(null);
   }
 
@@ -612,12 +661,9 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
       return;
     }
 
-    setPracticeConfig({
-      youtubeUrl: practiceConfig.youtubeUrl,
-      syncPoints: normalizeSyncPoints(
-        practiceConfig.syncPoints.filter((point) => point.t_sec !== editingSyncSecond)
-      ),
-    });
+    setPracticeConfig(
+      applySyncPointRemoval(practiceConfig, syncTarget, editingSyncSecond)
+    );
     setEditingSyncSecond(null);
   }
 
@@ -672,7 +718,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
               onToggleTheme={handleToggleTheme}
               onTogglePracticeMode={handleTogglePracticeMode}
               onOpenVideoSettings={() => setIsVideoSettingsOpen(true)}
-              onPhaseSeconds={handlePhaseSeconds}
+              onPhaseNavigate={handlePhaseNavigate}
             />
             <Suspense fallback={null}>
               <ValidationPanel onSelectIssue={handleSelectValidationIssue} />
@@ -702,6 +748,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
                   onViewModeChange={setPracticeViewMode}
                   onTimelineTimeChange={handlePracticeTimelineTimeChange}
                   onVideoTimeChange={handlePracticeVideoTimeChange}
+                  onVideoSourceChange={handlePracticeVideoSourceChange}
                 />
               </Suspense>
 
@@ -732,6 +779,8 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
                     focusLineIndex={validationFocus?.location.lineIndex}
                     focusSkillId={validationFocus?.location.skillId}
                     focusRequestKey={validationFocus?.requestKey}
+                    scrollToSecond={phaseScrollToSecond}
+                    scrollRequestKey={phaseScrollRequestKey}
                     followTime
                     onTimeClick={handleTimeClick}
                     syncSeconds={syncSeconds}
@@ -744,10 +793,12 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
           <TimelineGrid
             tl={tl}
             seconds={seconds}
-            focusSecond={validationFocus?.location.t_sec}
+            focusSecond={timelineFocusSecond}
             focusLineIndex={validationFocus?.location.lineIndex}
             focusSkillId={validationFocus?.location.skillId}
-            focusRequestKey={validationFocus?.requestKey}
+            focusRequestKey={timelineFocusRequestKey}
+            scrollToSecond={phaseScrollToSecond}
+            scrollRequestKey={phaseScrollRequestKey}
             onTimeClick={handleTimeClick}
             syncSeconds={syncSeconds}
           />
@@ -792,6 +843,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
         <Suspense fallback={null}>
         <TimelineVideoSettingsDialog
           theme={theme}
+          team={team}
           practice={practiceConfig}
           onClose={() => setIsVideoSettingsOpen(false)}
           onSave={handlePracticeChange}
@@ -804,8 +856,11 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
         <TimelineSyncPointDialog
           theme={theme}
           timelineSec={editingSyncSecond}
+          syncTarget={syncTarget}
+          syncTargetOptions={syncTargetOptions}
+          onSyncTargetChange={handleSyncTargetChange}
           initialVideoSec={editingSyncPoint?.video_sec ?? null}
-          currentVideoSec={practiceVideoSec}
+          currentVideoSec={isPracticeMode ? practiceVideoSec : null}
           onClose={() => setEditingSyncSecond(null)}
           onDelete={handleDeleteSyncPoint}
           onSave={handleSaveSyncPoint}

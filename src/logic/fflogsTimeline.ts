@@ -1,5 +1,16 @@
 import { JOB_SKILLS, SKILL_MAP, getJobSkillIds } from "../data/skills";
-import type { ElementType, JobId, Moment, PlanUsage, SkillData, SkillId, Timeline } from "../types";
+import { jobCmp } from "../config/jobPriority";
+import type {
+  ElementType,
+  JobId,
+  JobSkillMode,
+  Moment,
+  PlanUsage,
+  SkillData,
+  SkillId,
+  Timeline,
+} from "../types";
+import { isAstCardSkill } from "./astCards";
 import { validateTimeline } from "./validate";
 
 const FFLOGS_GRAPHQL_ENDPOINT = "https://ja.fflogs.com/api/v2/client";
@@ -61,7 +72,7 @@ type FflogsEventsPage = {
 };
 
 type FflogsEventsStrategy = {
-  dataType: "Casts" | "All" | "DamageDone" | "Buffs";
+  dataType: "Casts" | "All" | "DamageDone" | "Buffs" | "Resources";
   filterExpression?: string | null;
   hostilityType?: "Enemies" | "Friendlies" | null;
   includeFightIds: boolean;
@@ -87,13 +98,32 @@ export type FflogsTimelineImportResult = {
   usages: PlanUsage[];
   team: JobId[];
   expandedJobs: JobId[];
+  evolveJobs: JobId[];
   cooldownUsageCount: number;
+  unmatchedCooldowns: FflogsUnmatchedCooldown[];
 };
 
 export type FflogsAccessTokenResult = {
   accessToken: string;
   tokenType?: string;
   expiresIn?: number;
+};
+
+export type FflogsUnmatchedCooldown = {
+  t_sec: number;
+  abilityName: string;
+  actorName?: string;
+  actorJobId?: JobId | null;
+  type?: string;
+  count: number;
+};
+
+export type FflogsImportOptions = {
+  includeAutoAttacks?: boolean;
+  damageMergeWindowSec?: number;
+  autoAttackMergeWindowSec?: number;
+  cooldownDedupeWindowSec?: number;
+  unmatchedCooldownLimit?: number;
 };
 
 function normalizeAccessToken(input: string) {
@@ -372,10 +402,6 @@ function buildActorMap(masterData: FflogsMasterData) {
   return map;
 }
 
-function isFriendlyActor(actor?: FflogsActor) {
-  return actor?.type === "Player" || actor?.type === "Pet";
-}
-
 const JOB_SUBTYPE_ALIASES: Array<[JobId, readonly string[]]> = [
   ["tank.pld", ["Paladin", "PLD", "ナイト"]],
   ["tank.war", ["Warrior", "WAR", "戦士"]],
@@ -400,83 +426,6 @@ const JOB_SUBTYPE_ALIASES: Array<[JobId, readonly string[]]> = [
   ["caster.pct", ["Pictomancer", "PCT", "ピクトマンサー"]],
 ];
 
-const SKILL_NAME_ALIASES: Record<string, readonly string[]> = {
-  "tank.reprisal": ["Reprisal"],
-  "tank.rampart": ["Rampart"],
-  "tank.war.shake": ["Shake It Off"],
-  "tank.war.holmgang": ["Holmgang"],
-  "tank.war.damnation": ["Damnation"],
-  "tank.war.bloodwhetting": ["Bloodwhetting"],
-  "tank.war.thrill_of_battle": ["Thrill of Battle"],
-  "tank.pld.divine_veil": ["Divine Veil"],
-  "tank.pld.passage_of_arms": ["Passage of Arms"],
-  "tank.pld.hallowed_ground": ["Hallowed Ground"],
-  "tank.pld.sentinel": ["Sentinel"],
-  "tank.pld.bulwark": ["Bulwark"],
-  "tank.pld.holy_sheltron": ["Holy Sheltron"],
-  "tank.drk.dark_missionary": ["Dark Missionary"],
-  "tank.drk.living_dead": ["Living Dead"],
-  "tank.drk.shadow_wall": ["Shadow Wall"],
-  "tank.drk.blackest_night": ["The Blackest Night"],
-  "tank.drk.oblation": ["Oblation"],
-  "tank.gnb.heart_of_light": ["Heart of Light"],
-  "tank.gnb.superbolide": ["Superbolide"],
-  "tank.gnb.great_nebula": ["Great Nebula", "グレートネビュラ"],
-  "tank.gnb.camouflage": ["Camouflage"],
-  "tank.gnb.heart_of_corundum": ["Heart of Corundum"],
-  "melee.feint": ["Feint"],
-  "ranged.brd.troubadour": ["Troubadour"],
-  "ranged.mch.tactician": ["Tactician"],
-  "ranged.mch.dismantle": ["Dismantle"],
-  "ranged.dnc.shield_samba": ["Shield Samba", "守りのサンバ"],
-  "ranged.dnc.improvisation": ["Improvisation"],
-  "ranged.dnc.improvised_finish": ["Improvised Finish"],
-  "caster.addle": ["Addle"],
-  "caster.rdm.magick_barrier": ["Magick Barrier", "マジックバリア"],
-  "caster.pct.tempera_grassa": ["Tempera Grassa", "テンペラ・グラッサ"],
-  "healer.whm.temperance": ["Temperance"],
-  "healer.whm.divine_caress": ["Divine Caress"],
-  "healer.whm.plenary_indulgence": ["Plenary Indulgence"],
-  "healer.whm.asylum": ["Asylum"],
-  "healer.whm.liturgy_of_the_bell": ["Liturgy of the Bell"],
-  "healer.whm.divine_benison": ["Divine Benison"],
-  "healer.whm.aquaveil": ["Aquaveil"],
-  "healer.ast.collective_unconscious": ["Collective Unconscious"],
-  "healer.ast.neutral_sect": ["Neutral Sect"],
-  "healer.ast.sun_sign": ["Sun Sign"],
-  "healer.ast.celestial_opposition": ["Celestial Opposition"],
-  "healer.ast.earthly_star": ["Earthly Star"],
-  "healer.ast.macrocosmos": ["Macrocosmos"],
-  "healer.ast.horoscope": ["Horoscope"],
-  "healer.ast.lightspeed": ["Lightspeed"],
-  "healer.ast.celestial_intersection": ["Celestial Intersection"],
-  "healer.ast.exaltation": ["Exaltation"],
-  "healer.ast.astral_draw": ["Astral Draw"],
-  "healer.ast.umbral_draw": ["Umbral Draw"],
-  "healer.sch.aetherflow": ["Aetherflow"],
-  "healer.sch.sacred_soil": ["Sacred Soil"],
-  "healer.sch.whispering_dawn": ["Whispering Dawn"],
-  "healer.sch.fey_illumination": ["Fey Illumination"],
-  "healer.sch.expedient": ["Expedient"],
-  "healer.sch.summon_seraph": ["Summon Seraph"],
-  "healer.sch.consolation": ["Consolation"],
-  "healer.sch.dissipation": ["Dissipation"],
-  "healer.sch.excogitation": ["Excogitation"],
-  "healer.sch.protraction": ["Protraction"],
-  "healer.sch.recitation": ["Recitation"],
-  "healer.sge.kerachole": ["Kerachole"],
-  "healer.sge.physis_ii": ["Physis II", "ピュシス2"],
-  "healer.sge.holos": ["Holos"],
-  "healer.sge.panhaima": ["Panhaima"],
-  "healer.sge.haima": ["Haima"],
-  "healer.sge.philosophia": ["Philosophia"],
-  "healer.sge.rhizomata": ["Rhizomata"],
-  "healer.sge.ixochole": ["Ixochole"],
-  "healer.sge.taurochole": ["Taurochole"],
-  "healer.sge.krasis": ["Krasis"],
-  "healer.sge.zoe": ["Zoe"],
-};
-
 function normalizeLookupName(value: string) {
   return value
     .normalize("NFKC")
@@ -496,19 +445,31 @@ function buildJobSubtypeMap() {
 }
 
 function isImportableCooldownSkill(skill: SkillData) {
-  return skill.cooldown_s > 1 || Boolean(skill.parentSkillId);
+  return skill.cooldown_s > 1 || Boolean(skill.parentSkillId) || isAstCardSkill(skill.id);
 }
 
 function buildCooldownSkillNameMap() {
-  const map = new Map<string, SkillId>();
+  const map = new Map<string, SkillId[]>();
+  const addSkill = (name: string, skillId: SkillId) => {
+    const key = normalizeLookupName(name);
+    const skillIds = map.get(key);
+    if (skillIds) {
+      if (!skillIds.includes(skillId)) {
+        skillIds.push(skillId);
+      }
+      return;
+    }
+    map.set(key, [skillId]);
+  };
+
   for (const skill of Object.values(SKILL_MAP)) {
     if (!isImportableCooldownSkill(skill)) {
       continue;
     }
 
-    map.set(normalizeLookupName(skill.name), skill.id);
-    for (const alias of SKILL_NAME_ALIASES[skill.id] ?? []) {
-      map.set(normalizeLookupName(alias), skill.id);
+    addSkill(skill.name, skill.id);
+    for (const alias of skill.fflogsAliases ?? []) {
+      addSkill(alias, skill.id);
     }
   }
   return map;
@@ -516,6 +477,7 @@ function buildCooldownSkillNameMap() {
 
 const JOB_SUBTYPE_MAP = buildJobSubtypeMap();
 const COOLDOWN_SKILL_NAME_MAP = buildCooldownSkillNameMap();
+const JOB_SKILL_ID_SETS = new Map<string, Set<SkillId>>();
 
 function getActorJobId(actor?: FflogsActor) {
   const subType = actor?.subType;
@@ -523,6 +485,16 @@ function getActorJobId(actor?: FflogsActor) {
     return null;
   }
   return JOB_SUBTYPE_MAP.get(normalizeLookupName(subType)) ?? null;
+}
+
+function isFriendlyActor(actor?: FflogsActor) {
+  if (!actor) {
+    return false;
+  }
+  if (actor.type === "Player" || actor.type === "Pet") {
+    return true;
+  }
+  return Boolean(getActorJobId(actor));
 }
 
 function inferJobIdFromSkillId(skillId: SkillId) {
@@ -533,8 +505,29 @@ function inferJobIdFromSkillId(skillId: SkillId) {
   return `${parts[0]}.${parts[1]}` as JobId;
 }
 
-function jobCanUseSkill(jobId: JobId, skillId: SkillId) {
-  return getJobSkillIds(jobId, true).includes(skillId);
+function getJobSkillIdSet(jobId: JobId, mode: JobSkillMode) {
+  const key = `${jobId}:${mode}`;
+  const cached = JOB_SKILL_ID_SETS.get(key);
+  if (cached) {
+    return cached;
+  }
+
+  const skillIds = new Set(getJobSkillIds(jobId, true, mode));
+  JOB_SKILL_ID_SETS.set(key, skillIds);
+  return skillIds;
+}
+
+function getPreferredSkillModes(
+  jobId: JobId | null,
+  evolveJobs: ReadonlySet<JobId>
+): JobSkillMode[] {
+  return jobId && evolveJobs.has(jobId)
+    ? ["evolve", "normal"]
+    : ["normal", "evolve"];
+}
+
+function jobCanUseSkill(jobId: JobId, skillId: SkillId, mode: JobSkillMode) {
+  return getJobSkillIdSet(jobId, mode).has(skillId);
 }
 
 function resolveEvents(events: readonly FflogsEvent[], masterData: FflogsMasterData) {
@@ -717,12 +710,39 @@ async function fetchEnemyDamageEvents(
   return [];
 }
 
-function getCooldownSkillId(event: FflogsEvent) {
+function getCooldownSkillCandidates(event: FflogsEvent) {
   const abilityName = getAbilityName(event);
   if (!abilityName) {
+    return [];
+  }
+  return COOLDOWN_SKILL_NAME_MAP.get(normalizeLookupName(abilityName)) ?? [];
+}
+
+function getCooldownSkillId(
+  event: FflogsEvent,
+  actorJobId: JobId | null,
+  evolveJobs: ReadonlySet<JobId>
+) {
+  const candidates = getCooldownSkillCandidates(event);
+  if (candidates.length === 0) {
     return null;
   }
-  return COOLDOWN_SKILL_NAME_MAP.get(normalizeLookupName(abilityName)) ?? null;
+
+  if (actorJobId) {
+    for (const mode of getPreferredSkillModes(actorJobId, evolveJobs)) {
+      const skillId = candidates.find((candidate) =>
+        jobCanUseSkill(actorJobId, candidate, mode)
+      );
+      if (skillId) {
+        return skillId;
+      }
+    }
+  }
+
+  const normalSkillId = candidates.find(
+    (candidate) => !SKILL_MAP[candidate]?.evolveBaseSkillId
+  );
+  return normalSkillId ?? candidates[0] ?? null;
 }
 
 function isFriendlyCooldownEventCandidate(event: FflogsEvent) {
@@ -734,7 +754,7 @@ function isFriendlyCooldownEventCandidate(event: FflogsEvent) {
     return false;
   }
 
-  if (!getCooldownSkillId(event)) {
+  if (getCooldownSkillCandidates(event).length === 0) {
     return false;
   }
 
@@ -746,7 +766,34 @@ function isFriendlyCooldownEventCandidate(event: FflogsEvent) {
     type === "applybuff" ||
     type === "refreshbuff" ||
     type === "applybuffstack" ||
-    type === "refreshbuffstack"
+    type === "refreshbuffstack" ||
+    type === "resourcechange"
+  );
+}
+
+function isFriendlyPotentialCooldownEvent(event: FflogsEvent) {
+  if (typeof event.timestamp !== "number") {
+    return false;
+  }
+
+  if (event.sourceIsFriendly === false) {
+    return false;
+  }
+
+  if (!getAbilityName(event)) {
+    return false;
+  }
+
+  const type = event.type?.toLowerCase() ?? "";
+  return (
+    !type ||
+    type === "cast" ||
+    type === "begincast" ||
+    type === "applybuff" ||
+    type === "refreshbuff" ||
+    type === "applybuffstack" ||
+    type === "refreshbuffstack" ||
+    type === "resourcechange"
   );
 }
 
@@ -782,9 +829,21 @@ async function fetchFriendlyCooldownEvents(
       maxPages: 80,
     },
     {
+      dataType: "Resources",
+      hostilityType: "Friendlies",
+      includeFightIds: true,
+      maxPages: 80,
+    },
+    {
+      dataType: "Resources",
+      hostilityType: "Friendlies",
+      includeFightIds: false,
+      maxPages: 80,
+    },
+    {
       dataType: "All",
       filterExpression:
-        'type = "cast" OR type = "begincast" OR type = "applybuff" OR type = "refreshbuff" OR type = "applybuffstack" OR type = "refreshbuffstack"',
+        'type = "cast" OR type = "begincast" OR type = "applybuff" OR type = "refreshbuff" OR type = "applybuffstack" OR type = "refreshbuffstack" OR type = "resourcechange"',
       hostilityType: "Friendlies",
       includeFightIds: true,
       maxPages: 80,
@@ -792,13 +851,14 @@ async function fetchFriendlyCooldownEvents(
     {
       dataType: "All",
       filterExpression:
-        'type = "cast" OR type = "begincast" OR type = "applybuff" OR type = "refreshbuff" OR type = "applybuffstack" OR type = "refreshbuffstack"',
+        'type = "cast" OR type = "begincast" OR type = "applybuff" OR type = "refreshbuff" OR type = "applybuffstack" OR type = "refreshbuffstack" OR type = "resourcechange"',
       hostilityType: "Friendlies",
       includeFightIds: false,
       maxPages: 80,
     },
   ];
   const events: FflogsEvent[] = [];
+  const seenEventKeys = new Set<string>();
 
   for (const strategy of strategies) {
     try {
@@ -806,7 +866,25 @@ async function fetchFriendlyCooldownEvents(
         await fetchCastEventsWithStrategy(accessToken, code, fight, strategy),
         masterData
       );
-      events.push(...resolvedEvents.filter(isFriendlyCooldownEventCandidate));
+      for (const event of resolvedEvents) {
+        if (!isFriendlyPotentialCooldownEvent(event)) {
+          continue;
+        }
+
+        const eventKey = [
+          event.timestamp ?? "",
+          event.packetID ?? event.packetId ?? "",
+          event.sourceID ?? "",
+          event.abilityGameID ?? getAbilityName(event) ?? "",
+          event.type ?? "",
+        ].join(":");
+        if (seenEventKeys.has(eventKey)) {
+          continue;
+        }
+
+        seenEventKeys.add(eventKey);
+        events.push(event);
+      }
     } catch {
       // Cooldown import is best-effort. Other strategies may still return enough data.
     }
@@ -836,7 +914,8 @@ function getCooldownUsageDedupeWindowSec(skill: SkillData) {
 function resolveCooldownUsageCandidates(
   fight: FflogsFight,
   masterData: FflogsMasterData,
-  events: readonly FflogsEvent[]
+  events: readonly FflogsEvent[],
+  evolveJobs: ReadonlySet<JobId>
 ) {
   const actors = buildActorMap(masterData);
   const candidates: CooldownUsageCandidate[] = [];
@@ -846,22 +925,32 @@ function resolveCooldownUsageCandidates(
       continue;
     }
 
-    const skillId = getCooldownSkillId(event);
     const timestamp = event.timestamp;
-    if (!skillId || typeof timestamp !== "number") {
+    if (typeof timestamp !== "number") {
       continue;
     }
 
     const sourceActor =
       typeof event.sourceID === "number" ? actors.get(event.sourceID) : undefined;
     const actorJobId = getActorJobId(sourceActor);
+    const skillId = getCooldownSkillId(event, actorJobId, evolveJobs);
+    if (!skillId) {
+      continue;
+    }
+
     const inferredJobId = inferJobIdFromSkillId(skillId);
+    const actorModes = getPreferredSkillModes(actorJobId, evolveJobs);
     const jobId =
-      actorJobId && jobCanUseSkill(actorJobId, skillId)
+      actorJobId &&
+      actorModes.some((mode) => jobCanUseSkill(actorJobId, skillId, mode))
         ? actorJobId
         : inferredJobId;
+    const jobModes = getPreferredSkillModes(jobId, evolveJobs);
 
-    if (!jobId || !jobCanUseSkill(jobId, skillId)) {
+    if (
+      !jobId ||
+      !jobModes.some((mode) => jobCanUseSkill(jobId, skillId, mode))
+    ) {
       continue;
     }
 
@@ -884,16 +973,28 @@ function resolveCooldownUsageCandidates(
 function buildCooldownUsages(
   fight: FflogsFight,
   masterData: FflogsMasterData,
-  events: readonly FflogsEvent[]
+  events: readonly FflogsEvent[],
+  evolveJobs: ReadonlySet<JobId>,
+  options: FflogsImportOptions = {}
 ) {
   const usages: PlanUsage[] = [];
   const lastUsageByJobSkill = new Map<string, PlanUsage>();
 
-  for (const candidate of resolveCooldownUsageCandidates(fight, masterData, events)) {
+  for (const candidate of resolveCooldownUsageCandidates(
+    fight,
+    masterData,
+    events,
+    evolveJobs
+  )) {
     const key = `${candidate.jobId}::${candidate.skillId}`;
     const skill = SKILL_MAP[candidate.skillId];
     const lastUsage = lastUsageByJobSkill.get(key);
-    const dedupeWindow = skill ? getCooldownUsageDedupeWindowSec(skill) : 4;
+    const dedupeWindow =
+      options.cooldownDedupeWindowSec !== undefined
+        ? Math.max(0, options.cooldownDedupeWindowSec)
+        : skill
+          ? getCooldownUsageDedupeWindowSec(skill)
+          : 4;
 
     if (lastUsage && candidate.tSec - lastUsage.t_sec <= dedupeWindow) {
       continue;
@@ -912,8 +1013,65 @@ function buildCooldownUsages(
   return usages;
 }
 
+function buildUnmatchedCooldowns(
+  fight: FflogsFight,
+  masterData: FflogsMasterData,
+  events: readonly FflogsEvent[],
+  evolveJobs: ReadonlySet<JobId>,
+  limit = 30
+): FflogsUnmatchedCooldown[] {
+  const actors = buildActorMap(masterData);
+  const unmatchedByKey = new Map<string, FflogsUnmatchedCooldown>();
+
+  for (const event of events) {
+    if (!isFriendlyPotentialCooldownEvent(event)) {
+      continue;
+    }
+
+    const abilityName = getAbilityName(event);
+    const timestamp = event.timestamp;
+    if (!abilityName || typeof timestamp !== "number") {
+      continue;
+    }
+
+    const sourceActor =
+      typeof event.sourceID === "number" ? actors.get(event.sourceID) : undefined;
+    const actorJobId = getActorJobId(sourceActor);
+    if (getCooldownSkillId(event, actorJobId, evolveJobs)) {
+      continue;
+    }
+
+    const tSec = Math.max(0, Math.round((timestamp - fight.startTime) / 1000));
+    const key = [
+      abilityName,
+      sourceActor?.name ?? "",
+      actorJobId ?? "",
+      event.type ?? "",
+    ].join("::");
+    const current = unmatchedByKey.get(key);
+    if (current) {
+      current.count += 1;
+      current.t_sec = Math.min(current.t_sec, tSec);
+      continue;
+    }
+
+    unmatchedByKey.set(key, {
+      t_sec: tSec,
+      abilityName,
+      actorName: sourceActor?.name,
+      actorJobId,
+      type: event.type,
+      count: 1,
+    });
+  }
+
+  return Array.from(unmatchedByKey.values())
+    .sort((a, b) => a.t_sec - b.t_sec || b.count - a.count || a.abilityName.localeCompare(b.abilityName))
+    .slice(0, limit);
+}
+
 function buildTeamFromUsages(usages: readonly PlanUsage[]) {
-  return Array.from(new Set(usages.map((usage) => usage.jobId)));
+  return Array.from(new Set(usages.map((usage) => usage.jobId))).sort(jobCmp);
 }
 
 function buildExpandedJobsFromUsages(usages: readonly PlanUsage[]) {
@@ -924,7 +1082,29 @@ function buildExpandedJobsFromUsages(usages: readonly PlanUsage[]) {
       expandedJobs.add(usage.jobId);
     }
   }
-  return Array.from(expandedJobs);
+  return Array.from(expandedJobs).sort(jobCmp);
+}
+
+function buildEvolveJobsFromUsages(
+  usages: readonly PlanUsage[],
+  requestedEvolveJobs: ReadonlySet<JobId>
+) {
+  const team = new Set(usages.map((usage) => usage.jobId));
+  const evolveJobs = new Set<JobId>();
+
+  for (const jobId of requestedEvolveJobs) {
+    if (team.has(jobId)) {
+      evolveJobs.add(jobId);
+    }
+  }
+
+  for (const usage of usages) {
+    if (SKILL_MAP[usage.skillId]?.evolveBaseSkillId) {
+      evolveJobs.add(usage.jobId);
+    }
+  }
+
+  return Array.from(evolveJobs).sort(jobCmp);
 }
 
 function getErrorSummary(error: unknown) {
@@ -1396,9 +1576,11 @@ function median(values: readonly number[]) {
 
 function buildDamageOccurrences(
   fight: FflogsFight,
-  events: readonly FflogsEvent[]
+  events: readonly FflogsEvent[],
+  options: FflogsImportOptions = {}
 ) {
   const draftsByKey = new Map<string, DamageOccurrenceDraft>();
+  const includeAutoAttacks = options.includeAutoAttacks ?? true;
 
   for (const event of events) {
     if (!isDamageEventCandidate(event)) {
@@ -1409,6 +1591,9 @@ function buildDamageOccurrences(
     const timestamp = event.timestamp;
     const damage = getDamageAmount(event);
     if (!abilityName || typeof timestamp !== "number" || damage === null) {
+      continue;
+    }
+    if (!includeAutoAttacks && abilityName === "AA") {
       continue;
     }
 
@@ -1467,11 +1652,43 @@ function buildDamageOccurrences(
     occurrencesByAbility.set(occurrence.abilityName, list);
   }
 
-  for (const list of occurrencesByAbility.values()) {
+  for (const [abilityName, list] of occurrencesByAbility.entries()) {
     list.sort((a, b) => a.timestamp - b.timestamp);
+    occurrencesByAbility.set(
+      abilityName,
+      mergeCloseDamageOccurrences(
+        list,
+        abilityName === "AA"
+          ? options.autoAttackMergeWindowSec ?? 1
+          : options.damageMergeWindowSec ?? 0
+      )
+    );
   }
 
   return occurrencesByAbility;
+}
+
+function mergeCloseDamageOccurrences(
+  occurrences: readonly DamageOccurrence[],
+  windowSec: number
+) {
+  if (windowSec <= 0 || occurrences.length <= 1) {
+    return [...occurrences];
+  }
+
+  const windowMs = windowSec * 1000;
+  const merged: DamageOccurrence[] = [];
+  for (const occurrence of occurrences) {
+    const previous = merged[merged.length - 1];
+    if (previous && occurrence.timestamp - previous.timestamp <= windowMs) {
+      previous.key = `${previous.key}+${occurrence.key}`;
+      previous.damage = Math.max(previous.damage, occurrence.damage);
+      previous.elem = preferDamageElement(previous.elem, occurrence.elem);
+      continue;
+    }
+    merged.push({ ...occurrence });
+  }
+  return merged;
 }
 
 function findDamageOccurrence(
@@ -1521,10 +1738,11 @@ function buildTimelineFromCasts(
   code: string,
   fight: FflogsFight,
   events: readonly FflogsEvent[],
-  damageEvents: readonly FflogsEvent[]
+  damageEvents: readonly FflogsEvent[],
+  options: FflogsImportOptions = {}
 ) {
   const momentsByKey = new Map<string, Moment>();
-  const damageOccurrences = buildDamageOccurrences(fight, damageEvents);
+  const damageOccurrences = buildDamageOccurrences(fight, damageEvents, options);
   const usedDamageKeys = new Set<string>();
   const castCandidates = events
     .filter(isCastEventCandidate)
@@ -1697,10 +1915,13 @@ export async function importFflogsTimeline(args: {
   reportUrl: string;
   accessToken: string;
   baseTimeline?: Timeline | null;
+  evolveJobs?: readonly JobId[];
+  options?: FflogsImportOptions;
 }): Promise<FflogsTimelineImportResult> {
   const accessToken = normalizeAccessToken(args.accessToken);
   assertUsableAccessToken(accessToken);
 
+  const evolveJobs = new Set(args.evolveJobs ?? []);
   const { code, fightId } = parseReportUrl(args.reportUrl);
   const fights = await fetchFights(accessToken, code);
   const fight = selectFight(fights, fightId);
@@ -1711,14 +1932,29 @@ export async function importFflogsTimeline(args: {
     fight,
     masterData
   );
-  const usages = buildCooldownUsages(fight, masterData, cooldownEvents);
+  const importOptions = args.options ?? {};
+  const usages = buildCooldownUsages(
+    fight,
+    masterData,
+    cooldownEvents,
+    evolveJobs,
+    importOptions
+  );
+  const unmatchedCooldowns = buildUnmatchedCooldowns(
+    fight,
+    masterData,
+    cooldownEvents,
+    evolveJobs,
+    importOptions.unmatchedCooldownLimit ?? 30
+  );
   const timeline = args.baseTimeline
     ? buildTimelineWithCooldownLog(args.baseTimeline, code, fight, usages)
     : buildTimelineFromCasts(
         code,
         fight,
         await fetchEnemyCastEvents(accessToken, code, fight, masterData),
-        await fetchEnemyDamageEvents(accessToken, code, fight, masterData)
+        await fetchEnemyDamageEvents(accessToken, code, fight, masterData),
+        importOptions
       );
 
   return {
@@ -1728,6 +1964,8 @@ export async function importFflogsTimeline(args: {
     usages,
     team: buildTeamFromUsages(usages),
     expandedJobs: buildExpandedJobsFromUsages(usages),
+    evolveJobs: buildEvolveJobsFromUsages(usages, evolveJobs),
     cooldownUsageCount: usages.length,
+    unmatchedCooldowns,
   };
 }

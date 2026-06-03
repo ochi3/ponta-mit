@@ -3,7 +3,15 @@ import type { CSSProperties, DragEvent, JSX, MouseEvent } from "react";
 import { useStore } from "../state/store";
 import { JOBS } from "../data/jobs/jobs.registry";
 import { JOB_SKILLS, SKILL_MAP, hasSecondarySkills, getJobSkillIds } from "../data/skills";
-import type { Timeline, JobId, SkillData, Moment, ElementType, PlanUsage } from "../types";
+import type {
+  Timeline,
+  JobId,
+  SkillData,
+  Moment,
+  ElementType,
+  PlanUsage,
+  MomentTag,
+} from "../types";
 import Cell, { type CellVisualState } from "./Cell";
 import AstDrawCell from "./AstDrawCell";
 import SchAetherflowCell from "./SchAetherflowCell";
@@ -11,6 +19,12 @@ import SgeAddersgallCell from "./SgeAddersgallCell";
 import WhmLilyCell from "./WhmLilyCell";
 import StackCell from "./StackCell";
 import { formatSec } from "../logic/timelineView";
+import { resolveMomentNote } from "../logic/momentNotes";
+import {
+  clampMemoColumnWidth,
+  resolveMemoColumnWidth,
+} from "../logic/layoutPrefs";
+import { resolveTimelineId } from "../data/timelines/registry";
 import { getSkillIcon } from "../data/skills/icon.skills";
 import { getJobIcon } from "../data/jobs/jobIcons";
 import { getDamageTypeIcon } from "../data/damageTypeIcons";
@@ -73,6 +87,7 @@ const SKILL_COL_STACK_CSS_VAR = "var(--mp-skill-col-stack-w)";
 const MECHANISM_COL_CSS_VAR = "var(--mp-col-mech-w)";
 const TIME_COL_CSS_VAR = "var(--mp-col-time-w)";
 const EVENT_COL_CSS_VAR = "var(--mp-col-event-w)";
+const MEMO_COL_CSS_VAR = "var(--mp-col-memo-w)";
 const ELEMENT_COL_CSS_VAR = "var(--mp-col-elem-w)";
 
 const ELEMENT_LABELS: Record<ElementType, string> = {
@@ -80,6 +95,16 @@ const ELEMENT_LABELS: Record<ElementType, string> = {
   magic: "魔法",
   unique: "特殊",
   none: "無",
+};
+
+const MOMENT_TAG_LABELS: Record<MomentTag, string> = {
+  raidwide: "全体",
+  tankbuster: "強攻撃",
+  spread: "散開",
+  stack: "頭割り",
+  tower: "塔",
+  knockback: "ノックバック",
+  downtime: "殴れない",
 };
 
 // Process timeline file
@@ -196,8 +221,130 @@ function buildMechanismRuns(
   return mechanisms;
 }
 
+function secondHasTimelineEvent(tl: Timeline, sec: number) {
+  return tl.moments.some((moment) => moment.t_sec === sec);
+}
+
+function compactSecondLinesForEvents(secondLines: SecondLines[], tl: Timeline) {
+  let rowCursor = 0;
+  const filtered: SecondLines[] = [];
+
+  for (const secInfo of secondLines) {
+    if (!secondHasTimelineEvent(tl, secInfo.sec)) {
+      continue;
+    }
+    filtered.push({ ...secInfo, rowStart: rowCursor });
+    rowCursor += secInfo.lines.length;
+  }
+
+  return filtered;
+}
+
 function freezeStyle(left: string): CSSProperties {
   return { "--mp-freeze-left": left } as CSSProperties;
+}
+
+function MemoColumnHeader({
+  label,
+  widthPx,
+  freezeLeft,
+  onPreviewWidth,
+  onWidthCommit,
+}: {
+  label: string;
+  widthPx: number;
+  freezeLeft: string;
+  onPreviewWidth: (widthPx: number | null) => void;
+  onWidthCommit: (widthPx: number) => void;
+}) {
+  const handleResizeStart = (event: MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = widthPx;
+
+    const handleMove = (moveEvent: globalThis.MouseEvent) => {
+      const nextWidth = clampMemoColumnWidth(
+        startWidth + (moveEvent.clientX - startX)
+      );
+      onPreviewWidth(nextWidth);
+    };
+
+    const handleUp = (upEvent: globalThis.MouseEvent) => {
+      const nextWidth = clampMemoColumnWidth(
+        startWidth + (upEvent.clientX - startX)
+      );
+      onPreviewWidth(null);
+      onWidthCommit(nextWidth);
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+  };
+
+  const displayWidth = widthPx;
+
+  return (
+    <th
+      className="p-2 text-left mp-col-memo mp-col-freeze mp-col-freeze--middle"
+      rowSpan={2}
+      style={{
+        ...freezeStyle(freezeLeft),
+        width: displayWidth,
+        minWidth: displayWidth,
+        maxWidth: displayWidth,
+      }}
+    >
+      <span>{label}</span>
+      <div
+        className="mp-col-resize-handle"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={`${label}の列幅を変更`}
+        title="ドラッグで列幅を変更（共有されます）"
+        onMouseDown={handleResizeStart}
+      />
+    </th>
+  );
+}
+
+function MomentNoteInput({
+  value,
+  placeholder,
+  onCommit,
+}: {
+  value: string;
+  placeholder: string;
+  onCommit: (nextValue: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      className="mp-moment-note-input"
+      value={draft}
+      placeholder={placeholder}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => {
+        if (draft !== value) {
+          onCommit(draft);
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.currentTarget.blur();
+        }
+      }}
+      onClick={(event) => event.stopPropagation()}
+    />
+  );
 }
 
 function comparePoints(
@@ -223,6 +370,43 @@ function validationRowKey(location: Pick<ValidationLocation, "t_sec" | "lineInde
   return `${location.t_sec}::${location.lineIndex}`;
 }
 
+function resolvePhaseScrollRow(
+  wrapper: HTMLElement,
+  scrollToSecond: number
+) {
+  const primaryRow = wrapper.querySelector<HTMLTableRowElement>(
+    `tr[data-row-key="${scrollToSecond}::0"]`
+  );
+  if (primaryRow) {
+    return primaryRow;
+  }
+
+  const rowsAtSecond = Array.from(
+    wrapper.querySelectorAll<HTMLTableRowElement>(`tr[data-row-sec="${scrollToSecond}"]`)
+  );
+  if (rowsAtSecond.length > 0) {
+    return rowsAtSecond[0];
+  }
+
+  return Array.from(wrapper.querySelectorAll<HTMLTableRowElement>("tr[data-row-sec]")).find(
+    (row) => {
+      const sec = Number(row.dataset.rowSec);
+      return Number.isFinite(sec) && sec >= scrollToSecond;
+    }
+  );
+}
+
+function scrollWrapperToTimelineRow(wrapper: HTMLElement, targetRow: HTMLTableRowElement) {
+  const thead = wrapper.querySelector<HTMLElement>("thead.mp-header-sticky");
+  const headerHeight = thead ? Math.ceil(thead.getBoundingClientRect().height) : 48;
+  const gap = 4;
+  const wrapperRect = wrapper.getBoundingClientRect();
+  const rowRect = targetRow.getBoundingClientRect();
+  const delta = rowRect.top - wrapperRect.top - headerHeight - gap;
+
+  wrapper.scrollTop += delta;
+}
+
 export default function TimelineGrid({
   tl,
   seconds,
@@ -235,6 +419,8 @@ export default function TimelineGrid({
   focusLineIndex,
   focusSkillId,
   focusRequestKey,
+  scrollToSecond,
+  scrollRequestKey,
 }: {
   tl: Timeline;
   seconds: number[];
@@ -247,6 +433,9 @@ export default function TimelineGrid({
   focusLineIndex?: number | null;
   focusSkillId?: string | null;
   focusRequestKey?: number;
+  /** フェーズタブなどからの明示ジャンプ */
+  scrollToSecond?: number | null;
+  scrollRequestKey?: number;
 }) {
   const { t } = useI18n();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -254,14 +443,36 @@ export default function TimelineGrid({
   const team = useStore((s) => s.team);
   const setTeam = useStore((s) => s.setTeam);
   const usages = useStore((s) => s.usages);
+  const momentNotes = useStore((s) => s.momentNotes);
+  const setMomentNote = useStore((s) => s.setMomentNote);
+  const layoutPrefs = useStore(
+    (s) => s.plansByTimeline[resolveTimelineId(s.timelineId)]?.layoutPrefs
+  );
+  const memoWidthPx = resolveMemoColumnWidth(layoutPrefs);
+  const setMemoColumnWidth = useStore((s) => s.setMemoColumnWidth);
+  const [memoWidthOverridePx, setMemoWidthOverridePx] = useState<number | null>(
+    null
+  );
+  const activeMemoWidthPx = memoWidthOverridePx ?? memoWidthPx;
+  const tableLayoutStyle = useMemo(
+    () =>
+      ({
+        "--mp-col-memo-w": `${activeMemoWidthPx}px`,
+      }) as CSSProperties,
+    [activeMemoWidthPx]
+  );
   const expandedJobs = useStore((s) => s.expandedJobs);
+  const hideRowsWithoutEvents = useStore((s) => s.hideRowsWithoutEvents);
   const cardOnlyJobs = useStore((s) => s.cardOnlyJobs);
+  const evolveJobs = useStore((s) => s.evolveJobs);
   const toggleJobExpand = useStore((s) => s.toggleJobExpand);
   const toggleJobCardOnly = useStore((s) => s.toggleJobCardOnly);
+  const toggleJobEvolve = useStore((s) => s.toggleJobEvolve);
   const [draggingJobId, setDraggingJobId] = useState<JobId | null>(null);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
   const [damagePopover, setDamagePopover] = useState<DamagePopoverState | null>(null);
   const hasMechanisms = Boolean(tl.mechanisms?.length);
+
   const syncSecondsSet = useMemo(
     () => new Set(syncSeconds ?? []),
     [syncSeconds]
@@ -321,6 +532,11 @@ export default function TimelineGrid({
     clearJobDragState();
   }
 
+  function handleJobContextMenu(event: MouseEvent<HTMLTableCellElement>, jobId: JobId) {
+    event.preventDefault();
+    toggleJobEvolve(jobId);
+  }
+
   // Pre-build usage index for O(1) lookup in render
   const usageIndex = useMemo(() => {
     const map = new Map<string, typeof usages[0]>();
@@ -368,11 +584,16 @@ export default function TimelineGrid({
     const out: Col[] = [];
     for (const jobId of visibleTeam) {
       const jobName = JOBS.find((j) => j.id === jobId)?.name ?? jobId;
-      const isCardVisible = cardOnlyJobs.includes(jobId);
+      const skillMode = evolveJobs.includes(jobId) ? "evolve" : "normal";
+      const isCardVisible = skillMode === "normal" && cardOnlyJobs.includes(jobId);
       const isExpanded = expandedJobs.includes(jobId);
       const includeSecondary = isExpanded || isCardVisible;
-      const secondarySkillIds = new Set(JOB_SKILLS[jobId]?.secondary ?? []);
-      const skillIds = getJobSkillIds(jobId, includeSecondary).filter((skillId) => {
+      const skillSet =
+        skillMode === "evolve"
+          ? JOB_SKILLS[jobId]?.evolve ?? JOB_SKILLS[jobId]
+          : JOB_SKILLS[jobId];
+      const secondarySkillIds = new Set(skillSet?.secondary ?? []);
+      const skillIds = getJobSkillIds(jobId, includeSecondary, skillMode).filter((skillId) => {
         if (!(jobId === "healer.ast" && includeSecondary)) {
           return true;
         }
@@ -399,7 +620,7 @@ export default function TimelineGrid({
       }
     }
     return out;
-  }, [visibleTeam, expandedJobs, cardOnlyJobs]);
+  }, [visibleTeam, expandedJobs, cardOnlyJobs, evolveJobs]);
 
   const jobColspan = useMemo(() => {
     const m = new Map<JobId, number>();
@@ -435,6 +656,72 @@ export default function TimelineGrid({
     return m;
   }, [cols, jobColspan]);
 
+  useLayoutEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) {
+      return;
+    }
+
+    /** 画面全体の縦位置（50% より少し上） */
+    const SITE_CENTER_RATIO = 0.44;
+
+    const syncMechanismLayoutVars = () => {
+      const thead = wrapper.querySelector<HTMLElement>("thead.mp-header-sticky");
+      let headerOffset = 48;
+      if (thead) {
+        headerOffset = Math.ceil(thead.getBoundingClientRect().height);
+        wrapper.style.setProperty("--mp-sticky-header-offset", `${headerOffset}px`);
+      }
+
+      const viewportH = window.visualViewport?.height ?? window.innerHeight;
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const siteCenterY = viewportH * SITE_CENTER_RATIO;
+      let mechanismStickyTop = Math.round(siteCenterY - wrapperRect.top);
+
+      const minTop = headerOffset + 8;
+      const maxTop = Math.max(minTop, Math.ceil(wrapper.clientHeight) - 16);
+      mechanismStickyTop = Math.min(Math.max(mechanismStickyTop, minTop), maxTop);
+
+      wrapper.style.setProperty("--mp-mechanism-sticky-top", `${mechanismStickyTop}px`);
+    };
+
+    syncMechanismLayoutVars();
+
+    const thead = wrapper.querySelector<HTMLElement>("thead.mp-header-sticky");
+    const main = wrapper.closest("main");
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(syncMechanismLayoutVars)
+        : null;
+    resizeObserver?.observe(wrapper);
+    if (thead) {
+      resizeObserver?.observe(thead);
+    }
+    if (main) {
+      resizeObserver?.observe(main);
+    }
+
+    window.addEventListener("resize", syncMechanismLayoutVars);
+    window.addEventListener("scroll", syncMechanismLayoutVars, { passive: true });
+    window.visualViewport?.addEventListener("resize", syncMechanismLayoutVars);
+    window.visualViewport?.addEventListener("scroll", syncMechanismLayoutVars);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", syncMechanismLayoutVars);
+      window.removeEventListener("scroll", syncMechanismLayoutVars);
+      window.visualViewport?.removeEventListener("resize", syncMechanismLayoutVars);
+      window.visualViewport?.removeEventListener("scroll", syncMechanismLayoutVars);
+    };
+  }, [
+    team.length,
+    expandedJobs,
+    evolveJobs,
+    cardOnlyJobs,
+    activeMemoWidthPx,
+    jobFilter,
+    cols.length,
+  ]);
 
   const freezeOffsets = useMemo(
     () => ({
@@ -443,12 +730,15 @@ export default function TimelineGrid({
       event: hasMechanisms
         ? `calc(${MECHANISM_COL_CSS_VAR} + ${TIME_COL_CSS_VAR})`
         : TIME_COL_CSS_VAR,
-      elem: hasMechanisms
+      memo: hasMechanisms
         ? `calc(${MECHANISM_COL_CSS_VAR} + ${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR})`
         : `calc(${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR})`,
+      elem: hasMechanisms
+        ? `calc(${MECHANISM_COL_CSS_VAR} + ${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR} + ${MEMO_COL_CSS_VAR})`
+        : `calc(${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR} + ${MEMO_COL_CSS_VAR})`,
       damage: hasMechanisms
-        ? `calc(${MECHANISM_COL_CSS_VAR} + ${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR} + ${ELEMENT_COL_CSS_VAR})`
-        : `calc(${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR} + ${ELEMENT_COL_CSS_VAR})`,
+        ? `calc(${MECHANISM_COL_CSS_VAR} + ${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR} + ${MEMO_COL_CSS_VAR} + ${ELEMENT_COL_CSS_VAR})`
+        : `calc(${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR} + ${MEMO_COL_CSS_VAR} + ${ELEMENT_COL_CSS_VAR})`,
     }),
     [hasMechanisms]
   );
@@ -472,9 +762,27 @@ export default function TimelineGrid({
     [seconds, tl]
   );
 
-  const mechanismRuns = useMemo(
-    () => buildMechanismRuns(hasMechanisms, mechanismNames, secondLines),
-    [hasMechanisms, mechanismNames, secondLines]
+  const compactEventView = hideRowsWithoutEvents;
+
+  const displaySecondLines = useMemo(() => {
+    if (!compactEventView) {
+      return secondLines;
+    }
+    return compactSecondLinesForEvents(secondLines, tl);
+  }, [compactEventView, secondLines, tl]);
+
+  const displayRows = useMemo(() => {
+    if (!compactEventView) {
+      return rows;
+    }
+    const allowedSecs = new Set(displaySecondLines.map((secInfo) => secInfo.sec));
+    return rows.filter((row) => allowedSecs.has(row.sec));
+  }, [compactEventView, displaySecondLines, rows]);
+
+  const displayMechanismRuns = useMemo(
+    () =>
+      buildMechanismRuns(hasMechanisms, mechanismNames, displaySecondLines),
+    [displaySecondLines, hasMechanisms, mechanismNames]
   );
 
   const rowIndexLookup = useMemo(() => {
@@ -609,6 +917,42 @@ export default function TimelineGrid({
       targetRow.scrollIntoView({ block: "center" });
     }
   }, [followTime, focusSecond]);
+
+  useEffect(() => {
+    if (scrollRequestKey === undefined) {
+      return;
+    }
+    if (scrollToSecond === null || scrollToSecond === undefined) {
+      return;
+    }
+
+    const wrapper = wrapperRef.current;
+    if (!wrapper) {
+      return;
+    }
+
+    let cancelled = false;
+    const scrollToTarget = () => {
+      if (cancelled) {
+        return;
+      }
+
+      const targetRow = resolvePhaseScrollRow(wrapper, scrollToSecond);
+      if (!targetRow) {
+        return;
+      }
+
+      scrollWrapperToTimelineRow(wrapper, targetRow);
+    };
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(scrollToTarget);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [scrollRequestKey, scrollToSecond]);
 
   useEffect(() => {
     if (
@@ -1693,6 +2037,24 @@ export default function TimelineGrid({
     return <span className="mp-element-empty">—</span>;
   };
 
+  const renderMomentTags = (moment?: Moment) => {
+    if (!moment?.tags?.length) return null;
+
+    return (
+      <div className="mp-moment-tags" aria-label="タイムラインタグ">
+        {moment.tags.map((tag) => (
+          <span
+            key={tag}
+            className={`mp-moment-tag mp-moment-tag--${tag}`}
+            title={MOMENT_TAG_LABELS[tag] ?? tag}
+          >
+            {MOMENT_TAG_LABELS[tag] ?? tag}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   const renderDamageContent = (moment?: Moment) => {
         if (!moment) return <span className="mp-damage-none">—</span>;
 
@@ -1955,7 +2317,7 @@ export default function TimelineGrid({
   return (
     <div className="w-full">
       <div className="w-full px-2 mp-shell">
-        <div ref={wrapperRef} className="rounded mp-wrapper">
+        <div ref={wrapperRef} className="rounded mp-wrapper" style={tableLayoutStyle}>
           <table className="mp-table text-sm border-collapse">
             <thead className="mp-header-sticky">
               <tr>
@@ -1981,6 +2343,13 @@ export default function TimelineGrid({
                   style={freezeStyle(freezeOffsets.event)}>
                   {t("timeline.headers.event")}
                 </th>
+                <MemoColumnHeader
+                  label={t("timeline.headers.memo")}
+                  widthPx={activeMemoWidthPx}
+                  freezeLeft={freezeOffsets.memo}
+                  onPreviewWidth={setMemoWidthOverridePx}
+                  onWidthCommit={setMemoColumnWidth}
+                />
                 <th
                   className="p-2 text-center mp-col-element mp-col-freeze mp-col-freeze--middle"
                   rowSpan={2}
@@ -2008,10 +2377,12 @@ export default function TimelineGrid({
                   else roleGroup = "dps";
 
                   const roleClass = `mp-job-header--${roleGroup}`;
-                  const hasSecondary = hasSecondarySkills(jobId);
                   const isExpanded = expandedJobs.includes(jobId);
-                  const isCardVisible = cardOnlyJobs.includes(jobId);
-                  const canToggleCardOnly = jobId === "healer.ast";
+                  const isEvolve = evolveJobs.includes(jobId);
+                  const isCardVisible = !isEvolve && cardOnlyJobs.includes(jobId);
+                  const canToggleCardOnly = jobId === "healer.ast" && !isEvolve;
+                  const skillMode = isEvolve ? "evolve" : "normal";
+                  const hasSecondary = hasSecondarySkills(jobId, skillMode);
                   const isSingleColumnJob = span === 1;
 
                   return (
@@ -2023,10 +2394,12 @@ export default function TimelineGrid({
                       onDragEnd={clearJobDragState}
                       onDragOver={(event) => handleJobDragOver(event, jobId)}
                       onDrop={() => handleJobDrop(jobId)}
+                      onContextMenu={(event) => handleJobContextMenu(event, jobId)}
                       className={`p-2 text-center border-l mp-job-header mp-job-header--group ${roleClass} ${
                         canReorderJobs ? "mp-job-header--draggable" : ""
                       } ${draggingJobId === jobId ? "mp-job-header--dragging" : ""} ${
                         isSingleColumnJob ? "mp-job-header--single" : ""
+                      } ${isEvolve ? "mp-job-header--evolve" : ""
                       }`}
                       colSpan={span}
                       style={{
@@ -2048,6 +2421,11 @@ export default function TimelineGrid({
                           />
                         ) : (
                           <span className="mp-job-fallback">{name}</span>
+                        )}
+                        {isEvolve && (
+                          <span className="mp-job-evolve-badge" title="エヴォルヴ">
+                            EV
+                          </span>
                         )}
                         {hasSecondary && (
                           <button
@@ -2084,7 +2462,7 @@ export default function TimelineGrid({
 
               <tr>
                 {cols.map((c, ci) => {
-                  const icon = getSkillIcon(c.skill.id);
+                  const icon = getSkillIcon(c.skill.id) ?? c.skill.icon;
                   const skillName = c.skill.name;
                   const hasStacks =
                     isChargeSkill(c.skill) ||
@@ -2120,10 +2498,11 @@ export default function TimelineGrid({
             </thead>
 
             <tbody>
-              {rows.map((row, rowIndex) => {
+              {displayRows.map((row, displayIndex) => {
                 const mechanismCell = hasMechanisms
-                  ? mechanismRuns.get(row.rowIndex)
+                  ? displayMechanismRuns.get(displayIndex)
                   : undefined;
+                const summaryRowIndex = row.rowIndex;
                 const mechanismLabel = mechanismCell?.label ?? "";
                 const moment = row.line.moment;
                 const rowKey = `${row.sec}::${row.lineIndex}`;
@@ -2140,11 +2519,13 @@ export default function TimelineGrid({
                   >
                     {hasMechanisms && mechanismCell && (
                       <td
-                        className="p-1 text-center whitespace-nowrap mp-col-mechanism mp-col-freeze mp-col-freeze--first"
+                        className="p-0 mp-col-mechanism mp-col-freeze mp-col-freeze--first"
                         rowSpan={mechanismCell.span}
                         style={freezeStyle(freezeOffsets.mechanism)}>
-                        <div className="mp-mechanism-cell" title={mechanismLabel || undefined}>
-                          {mechanismLabel || ""}
+                        <div className="mp-mechanism-anchor">
+                          <div className="mp-mechanism-cell" title={mechanismLabel}>
+                            {mechanismLabel}
+                          </div>
                         </div>
                       </td>
                     )}
@@ -2187,8 +2568,32 @@ export default function TimelineGrid({
                     <td
                       className="p-1 mp-col-event mp-col-freeze mp-col-freeze--middle"
                       style={freezeStyle(freezeOffsets.event)}
-                      title={row.line.label}>
-                      {row.line.label || "—"}
+                      title={[
+                        row.line.label,
+                        ...(moment?.tags ?? []).map((tag) => MOMENT_TAG_LABELS[tag] ?? tag),
+                      ].filter(Boolean).join(" / ")}
+                    >
+                      <div className="mp-event-cell">
+                        {renderMomentTags(moment)}
+                        <span className="mp-event-name">{row.line.label || "—"}</span>
+                      </div>
+                    </td>
+                    <td
+                      className="p-1 mp-col-memo mp-col-freeze mp-col-freeze--middle"
+                      style={freezeStyle(freezeOffsets.memo)}
+                    >
+                      <MomentNoteInput
+                        value={resolveMomentNote(
+                          momentNotes,
+                          row.sec,
+                          row.lineIndex,
+                          moment?.note
+                        )}
+                        placeholder={t("timeline.headers.memo")}
+                        onCommit={(nextValue) =>
+                          setMomentNote(row.sec, row.lineIndex, nextValue.trim())
+                        }
+                      />
                     </td>
                     <td
                       className="p-1 text-center mp-col-element mp-col-freeze mp-col-freeze--middle"
@@ -2200,11 +2605,15 @@ export default function TimelineGrid({
                       style={freezeStyle(freezeOffsets.damage)}>
                       <div
                         className="mp-damage-popover-trigger"
-                        onMouseEnter={(event) => updateDamagePopover(rowIndex, event)}
-                        onMouseMove={(event) => updateDamagePopover(rowIndex, event)}
+                        onMouseEnter={(event) =>
+                          updateDamagePopover(summaryRowIndex, event)
+                        }
+                        onMouseMove={(event) =>
+                          updateDamagePopover(summaryRowIndex, event)
+                        }
                         onMouseLeave={() => setDamagePopover(null)}
                       >
-                        {renderDamageContentAtRow(moment, rowIndex)}
+                        {renderDamageContentAtRow(moment, summaryRowIndex)}
                       </div>
                     </td>
 
@@ -2269,7 +2678,7 @@ export default function TimelineGrid({
                               skill={c.skill}
                               t={row.sec}
                               lineIndex={row.lineIndex}
-                              visual={gridVisual[ci][rowIndex]}
+                              visual={gridVisual[ci][summaryRowIndex]}
                               cycleManualUsages={astCycleManualUsages}
                             />
                           ) : isWhmLily ? (
@@ -2278,7 +2687,7 @@ export default function TimelineGrid({
                               skill={c.skill}
                               t={row.sec}
                               lineIndex={row.lineIndex}
-                              visual={gridVisual[ci][rowIndex]}
+                              visual={gridVisual[ci][summaryRowIndex]}
                               usage={whmLilyUsage}
                             />
                           ) : isSchAetherflow ? (
@@ -2287,7 +2696,7 @@ export default function TimelineGrid({
                               skill={c.skill}
                               t={row.sec}
                               lineIndex={row.lineIndex}
-                              visual={gridVisual[ci][rowIndex]}
+                              visual={gridVisual[ci][summaryRowIndex]}
                               cycleManualUsages={schAetherflowCycleManualUsages}
                             />
                           ) : isSgeAddersgall ? (
@@ -2296,7 +2705,7 @@ export default function TimelineGrid({
                               skill={c.skill}
                               t={row.sec}
                               lineIndex={row.lineIndex}
-                              visual={gridVisual[ci][rowIndex]}
+                              visual={gridVisual[ci][summaryRowIndex]}
                               usage={sgeAddersgallUsage}
                             />
                           ) : hasStacks ? (
@@ -2305,7 +2714,7 @@ export default function TimelineGrid({
                               skill={c.skill}
                               t={row.sec}
                               lineIndex={row.lineIndex}
-                              visual={gridVisual[ci][rowIndex]}
+                              visual={gridVisual[ci][summaryRowIndex]}
                               usage={cellUsage}
                             />
                           ) : (
@@ -2314,7 +2723,7 @@ export default function TimelineGrid({
                               skill={c.skill}
                               t={row.sec}
                               lineIndex={row.lineIndex}
-                              visual={gridVisual[ci][rowIndex]}
+                              visual={gridVisual[ci][summaryRowIndex]}
                             />
                           )}
                         </td>

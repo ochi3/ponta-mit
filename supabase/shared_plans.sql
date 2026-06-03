@@ -13,6 +13,12 @@ create table if not exists public.shared_plans (
 alter table public.shared_plans
   add column if not exists practice jsonb not null default '{}'::jsonb;
 
+alter table public.shared_plans
+  add column if not exists moment_notes jsonb not null default '{}'::jsonb;
+
+alter table public.shared_plans
+  add column if not exists layout_prefs jsonb not null default '{}'::jsonb;
+
 create index if not exists shared_plans_updated_at_idx
   on public.shared_plans (updated_at desc);
 

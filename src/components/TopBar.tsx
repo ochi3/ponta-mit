@@ -1,12 +1,13 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
-import type { ThemeMode, Timeline } from "../types";
+import type { ThemeMode, Timeline, TimelinePracticeConfig } from "../types";
 import {
     BUILTIN_TIMELINE_OPTIONS,
+    DEFAULT_TIMELINE_ID,
     isBuiltinTimelineId,
     loadBuiltinTimeline,
+    resolveTimelineId,
 } from "../data/timelines/registry";
-import { secondsInPhase } from "../logic/timelineView";
 import { encodeShareUrl } from "../logic/share";
 import { parseTimelineJson } from "../logic/timelineImport";
 import { serializeTimelineJson } from "../logic/timelineExport";
@@ -15,12 +16,11 @@ import FflogsTimelineImportDialog from "./FflogsTimelineImportDialog";
 import type { FflogsTimelineImportResult } from "../logic/fflogsTimeline";
 import PhaseTabs from "./PhaseTabs";
 import TeamPicker from "./TeamPicker";
+import { hasAnyPracticeVideo } from "../logic/practiceVideo";
 import { useI18n, resolveIntlString } from "../i18n";
 
-function hasPracticeConfig(
-    practice?: { youtubeUrl?: string; syncPoints?: readonly unknown[] } | null
-) {
-    return Boolean(practice?.youtubeUrl?.trim() || practice?.syncPoints?.length);
+function hasPracticeConfig(practice?: Partial<TimelinePracticeConfig> | null) {
+    return hasAnyPracticeVideo(practice);
 }
 
 function sanitizeDownloadFileName(value: string) {
@@ -40,7 +40,7 @@ type Props = {
     onToggleTheme: () => void;
     onTogglePracticeMode: () => void;
     onOpenVideoSettings: () => void;
-    onPhaseSeconds: (secs: number[], phaseId?: string) => void;
+    onPhaseNavigate: (phaseId?: string, scrollSec?: number) => void;
 };
 
 export default function TopBar({
@@ -50,7 +50,7 @@ export default function TopBar({
     onToggleTheme,
     onTogglePracticeMode,
     onOpenVideoSettings,
-    onPhaseSeconds,
+    onPhaseNavigate,
 }: Props) {
     const [shareUrl, setShareUrl] = useState("");
     const [isCopied, setIsCopied] = useState(false);
@@ -58,7 +58,12 @@ export default function TopBar({
     const { t } = useI18n();
     const team = useStore((s) => s.team);
     const usages = useStore((s) => s.usages);
+    const momentNotes = useStore((s) => s.momentNotes);
     const timelineId = useStore((s) => s.timelineId);
+    const layoutPrefs = useStore(
+        (s) =>
+            s.plansByTimeline[resolveTimelineId(s.timelineId || tl.id)]?.layoutPrefs
+    );
     const undo = useStore((s) => s.undo);
     const redo = useStore((s) => s.redo);
     const undoCount = useStore(
@@ -76,8 +81,12 @@ export default function TopBar({
         ? "__import__"
         : timelineId && isBuiltinTimelineId(timelineId)
           ? timelineId
-          : "fru";
+          : DEFAULT_TIMELINE_ID;
+    const evolveJobs = useStore((s) => s.evolveJobs);
     const expandedJobs = useStore((s) => s.expandedJobs);
+    const hideRowsWithoutEvents = useStore((s) => s.hideRowsWithoutEvents);
+    const toggleAllJobExpand = useStore((s) => s.toggleAllJobExpand);
+    const toggleHideRowsWithoutEvents = useStore((s) => s.toggleHideRowsWithoutEvents);
     const roomPractice = useStore((s) => s.plansByTimeline[tl.id]?.practice);
     const contentPractice = useStore((s) => s.practiceDefaultsByTimeline[tl.id]);
     const setImportedTimeline = useStore((s) => s.setImportedTimeline);
@@ -98,7 +107,11 @@ export default function TopBar({
             team,
             usages,
             timelineId: timelineId || undefined,
-            expandedJobs: expandedJobs.length ? expandedJobs : undefined,
+            momentNotes: Object.keys(momentNotes).length ? momentNotes : undefined,
+            layoutPrefs:
+                layoutPrefs && Object.keys(layoutPrefs).length > 0
+                    ? layoutPrefs
+                    : undefined,
             practice: practice
                 ? {
                     youtubeUrl: practice.youtubeUrl,
@@ -129,7 +142,7 @@ export default function TopBar({
             if (!built) {
                 return;
             }
-            onPhaseSeconds(secondsInPhase(built, undefined));
+            onPhaseNavigate();
         });
     }
 
@@ -146,7 +159,7 @@ export default function TopBar({
             const tl = parseTimelineJson(text);
             setImportedTimeline(tl);
             setTimelineId(tl.id);
-            onPhaseSeconds(secondsInPhase(tl, undefined));
+            onPhaseNavigate();
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             window.alert(`Import failed: ${msg}`);
@@ -159,9 +172,10 @@ export default function TopBar({
             team: result.team,
             usages: result.usages,
             expandedJobs: result.expandedJobs,
+            evolveJobs: result.evolveJobs,
         });
         setTimelineId(result.timeline.id);
-        onPhaseSeconds(secondsInPhase(result.timeline, undefined));
+        onPhaseNavigate();
     }
 
     function handleSaveImportedTimelineJson() {
@@ -215,7 +229,16 @@ export default function TopBar({
         : "px-2 py-1 rounded-md border text-[11px] transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed border-slate-600 text-slate-100 hover:border-sky-500 hover:bg-slate-900";
 
     const labelTone = isLight ? "text-slate-600" : "text-slate-400";
-    const hasPracticeVideo = Boolean(practice?.youtubeUrl?.trim());
+    const hasPracticeVideo = hasAnyPracticeVideo(practice);
+    const allPersonalSkillsExpanded = useMemo(
+        () => team.length > 0 && team.every((jobId) => expandedJobs.includes(jobId)),
+        [expandedJobs, team]
+    );
+    const viewToggleActiveClass = isLight
+        ? "px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 border border-sky-500 text-sky-900 bg-sky-100"
+        : "px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 border border-sky-500 text-sky-100 bg-sky-500/15";
+    const viewToggleButtonClass = (active: boolean) =>
+        active ? viewToggleActiveClass : actionButtonClass;
 
     return (
     <div className="flex flex-col gap-4 mt-2 mb-3">
@@ -270,6 +293,42 @@ export default function TopBar({
                 <button type="button" onClick={handleGenerateLink} className={actionButtonClass}>
                     {t("topbar.actions.generateLink")}
                 </button>
+
+                {team.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => toggleAllJobExpand()}
+                        className={viewToggleButtonClass(allPersonalSkillsExpanded)}
+                        aria-pressed={allPersonalSkillsExpanded}
+                        title={
+                            allPersonalSkillsExpanded
+                                ? t("timeline.view.hideAllPersonalSkills")
+                                : t("timeline.view.showAllPersonalSkills")
+                        }
+                    >
+                        {allPersonalSkillsExpanded
+                            ? t("timeline.view.hideAllPersonalSkillsShort")
+                            : t("timeline.view.showAllPersonalSkillsShort")}
+                    </button>
+                )}
+
+                {tl.moments.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => toggleHideRowsWithoutEvents()}
+                        className={viewToggleButtonClass(hideRowsWithoutEvents)}
+                        aria-pressed={hideRowsWithoutEvents}
+                        title={
+                            hideRowsWithoutEvents
+                                ? t("timeline.view.showAllRows")
+                                : t("timeline.view.hideRowsWithoutEvents")
+                        }
+                    >
+                        {hideRowsWithoutEvents
+                            ? t("timeline.view.eventsOnlyShortOn")
+                            : t("timeline.view.eventsOnlyShort")}
+                    </button>
+                )}
 
                 <button type="button" onClick={onTogglePracticeMode} className={practiceButtonClass}>
                     {isPracticeMode ? "動画モードを閉じる" : "動画モード"}
@@ -395,7 +454,7 @@ export default function TopBar({
             <PhaseTabs
               key={tl.id}
               tl={tl}
-              onPhaseSeconds={onPhaseSeconds}
+              onPhaseNavigate={onPhaseNavigate}
             />
             </div>
         </div>
@@ -414,6 +473,7 @@ export default function TopBar({
             <FflogsTimelineImportDialog
                 theme={theme}
                 baseTimeline={tl}
+                evolveJobs={evolveJobs}
                 onClose={() => setIsFflogsImportOpen(false)}
                 onImport={handleImportFflogsTimeline}
             />

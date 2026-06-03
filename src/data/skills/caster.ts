@@ -5,6 +5,7 @@ export const SKILLS_CASTER = [
   {
     id: "caster.addle",
     name: "アドル",
+    fflogsAliases: ["Addle"],
     cooldown_s: 90,
     duration_s: 15,
     scope: "single_target",
@@ -19,7 +20,8 @@ export const SKILLS_CASTER = [
 export const SKILLS_CASTER_RDM = [
   {
     id: "caster.rdm.magick_barrier",
-    name: "マジチE��バリア",
+    name: "パマジク",
+    fflogsAliases: ["Magick Barrier", "マジックバリア"],
     cooldown_s: 120,
     duration_s: 10,
     scope: "range_party",
@@ -34,7 +36,8 @@ export const SKILLS_CASTER_RDM = [
 export const SKILLS_CASTER_PCT = [
   {
     id: "caster.pct.tempera_grassa",
-    name: "チE��ペラ・グラチE��",
+    name: "テンペラグラッサ",
+    fflogsAliases: ["Tempera Grassa", "テンペラ・グラッサ"],
     cooldown_s: 90,
     duration_s: 10,
     scope: "range_party",

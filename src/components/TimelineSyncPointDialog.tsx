@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { formatClock } from "../logic/youtube";
+import type { PracticeSyncTarget, SyncTargetOption } from "../logic/practiceVideo";
 import type { ThemeMode } from "../types";
 
 type Props = {
   theme: ThemeMode;
   timelineSec: number;
+  syncTarget: PracticeSyncTarget;
+  syncTargetOptions: readonly SyncTargetOption[];
+  onSyncTargetChange: (target: PracticeSyncTarget) => void;
   initialVideoSec: number | null;
   currentVideoSec: number | null;
   onClose: () => void;
@@ -22,6 +26,9 @@ function clampSeconds(value: number) {
 export default function TimelineSyncPointDialog({
   theme,
   timelineSec,
+  syncTarget,
+  syncTargetOptions,
+  onSyncTargetChange,
   initialVideoSec,
   currentVideoSec,
   onClose,
@@ -33,7 +40,7 @@ export default function TimelineSyncPointDialog({
 
   useEffect(() => {
     setVideoSec(initialVideoSec ?? currentVideoSec ?? 0);
-  }, [currentVideoSec, initialVideoSec, timelineSec]);
+  }, [currentVideoSec, initialVideoSec, syncTarget, timelineSec]);
 
   const overlayClass = isLight
     ? "bg-slate-900/35 backdrop-blur-sm"
@@ -44,6 +51,7 @@ export default function TimelineSyncPointDialog({
   const inputClass = isLight
     ? "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
     : "w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100";
+  const selectClass = inputClass;
   const subtleClass = isLight ? "text-slate-500" : "text-slate-400";
   const secondaryButtonClass = isLight
     ? "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:border-sky-400 hover:bg-sky-50"
@@ -68,6 +76,24 @@ export default function TimelineSyncPointDialog({
         </div>
 
         <div className="mt-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium">対象動画</label>
+            <select
+              value={syncTarget}
+              onChange={(event) => onSyncTargetChange(event.target.value as PracticeSyncTarget)}
+              className={`${selectClass} mt-2`}
+            >
+              {syncTargetOptions.map((option) => (
+                <option key={option.target} value={option.target}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p className={`mt-1 text-xs ${subtleClass}`}>
+              基本動画とジョブ別動画で、それぞれ別の同期を設定できます。
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium">動画秒</label>
             <input

@@ -1,5 +1,13 @@
 export type ElementType = "physical" | "magic" | "unique" | "none";
 export type MomentKind = "hit" | "event" | "mechanic";
+export type MomentTag =
+  | "raidwide"
+  | "tankbuster"
+  | "spread"
+  | "stack"
+  | "tower"
+  | "knockback"
+  | "downtime";
 
 export interface Moment {
   t_sec: number;
@@ -16,6 +24,7 @@ export interface Moment {
 
   note?: string;
   kind?: MomentKind;
+  tags?: MomentTag[];
 }
 
 export interface Phase {
@@ -46,6 +55,7 @@ export interface Timeline {
 export type RoleId = "tank" | "healer" | "melee" | "ranged" | "caster";
 export type JobId = string;
 export type SkillId = string;
+export type JobSkillMode = "normal" | "evolve";
 export type ThemeMode = "dark" | "light";
 
 export interface VideoSyncPoint {
@@ -53,14 +63,20 @@ export interface VideoSyncPoint {
   video_sec: number;
 }
 
+export type PracticeVideoSource = "base" | "job";
+
 export interface TimelinePracticeConfig {
   youtubeUrl: string;
   syncPoints: VideoSyncPoint[];
+  /** ジョブごとの動画URL（未設定のジョブは基本動画を使用） */
+  jobYoutubeUrls?: Partial<Record<JobId, string>>;
+  /** ジョブごとに「基本」か「ジョブ別」を選択 */
+  jobVideoSource?: Partial<Record<JobId, PracticeVideoSource>>;
+  /** ジョブごとの同期ポイント（基本動画の syncPoints と同じ形式） */
+  jobSyncPoints?: Partial<Record<JobId, VideoSyncPoint[]>>;
 }
 
-export interface PracticeSettings {
-  youtubeUrl: string;
-  syncPoints: VideoSyncPoint[];
+export interface PracticeSettings extends TimelinePracticeConfig {
   selectedJobId: JobId | null;
 }
 
@@ -79,6 +95,8 @@ export type SkillTag = "mitigation" | "shield" | "invuln" | "heal" | "utility";
 export interface SkillData {
   id: SkillId;
   name: string;
+  /** Ability names reported by FFLogs that differ from the local display name. */
+  fflogsAliases?: readonly string[];
   cooldown_s: number;
   duration_s?: number;
   /** Charge-based skills can hold this many uses at once. */
@@ -104,6 +122,8 @@ export interface SkillData {
   icon?: IconRef;
 
   parentSkillId?: SkillId;
+  /** Evolve-mode variants can reuse a base skill's display data with different tuning. */
+  evolveBaseSkillId?: SkillId;
 }
 
 export interface PlanUsage {
@@ -118,21 +138,37 @@ export type Team = JobId[];
 
 export type JobsRegistry = Job[];
 export type SkillMap = Record<SkillId, SkillData>;
+export type JobSkillSet = {
+  primary: SkillId[];
+  secondary?: SkillId[];
+};
 export type JobSkillsEntry = {
   primary: SkillId[];
   secondary?: SkillId[];
+  evolve?: JobSkillSet;
 };
 export type JobSkillsMap = Record<JobId, JobSkillsEntry>;
 
 export type GroupedSkills = Record<JobId, readonly SkillData[]>;
+
+export interface PlannerLayoutPrefs {
+  /** Memo column width in pixels. */
+  memoWidthPx?: number;
+}
 
 export interface SharePayload {
   v: number;
   team: Team;
   usages: PlanUsage[];
 
-  /** Secondary skill rows expanded for these jobs. */
+  /**
+   * 個人スキル展開（共有ルームでは同期しない。URL 共有時のみ任意）。
+   */
   expandedJobs?: JobId[];
+  /**
+   * 進化モード（共有ルームでは同期しない。URL 共有時のみ任意）。
+   */
+  evolveJobs?: JobId[];
 
   timelineId?: string;
   practice?: TimelinePracticeConfig;
@@ -140,6 +176,12 @@ export interface SharePayload {
   timelineInline?: {
     version: number;
     phases: Phase[];
-    moments: Pick<Moment, "t_sec" | "name" | "elem" | "damage" | "note">[];
+    moments: Pick<Moment, "t_sec" | "name" | "elem" | "damage" | "note" | "tags">[];
   };
+
+  /** Per-row memo overrides keyed by `${t_sec}::${lineIndex}`. */
+  momentNotes?: Record<string, string>;
+
+  /** Table layout preferences such as memo column width. */
+  layoutPrefs?: PlannerLayoutPrefs;
 }
