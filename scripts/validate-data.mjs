@@ -251,7 +251,7 @@ function extractMatches(text, regexp) {
 }
 
 function validateSkills() {
-  const skillFiles = ["tank.ts", "healer.ts", "melee.ts", "ranged.ts", "caster.ts"];
+  const skillFiles = ["tank.ts", "healer.ts", "melee.ts", "ranged.ts", "caster.ts", "utility.ts"];
   const iconText = readText("src", "data", "skills", "icon.skills.ts");
   const iconIds = new Set(extractMatches(iconText, /"([^"]+)":/g));
   const skillIds = [];

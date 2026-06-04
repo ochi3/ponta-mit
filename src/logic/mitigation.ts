@@ -1,4 +1,5 @@
 import type { ElementType, PlanUsage, SkillData } from "../types";
+import { getEffectDurationS, getStackMitigationMultiplier } from "./skillEffect";
 
 export interface ActiveMitigationEffect {
   skill: SkillData;
@@ -39,7 +40,7 @@ export function isUsageActiveAtPoint(
   tSec: number,
   lineIndex: number
 ): boolean {
-  const duration = skill.duration_s ?? 0;
+  const duration = getEffectDurationS(skill, usage);
 
   if (duration <= 0) {
     return usage.t_sec === tSec && usage.lineIndex === lineIndex;
@@ -59,8 +60,14 @@ export function isUsageActiveAtPoint(
 
 export function getMitigationMultiplier(
   skill: SkillData,
-  elem: ElementType
+  elem: ElementType,
+  usage?: Pick<PlanUsage, "stacks">
 ): number {
+  const stackMultiplier = getStackMitigationMultiplier(skill, elem, usage);
+  if (stackMultiplier !== null) {
+    return stackMultiplier;
+  }
+
   if (!skill.kinds.includes("mitigation")) {
     return 1;
   }
@@ -129,7 +136,7 @@ export function buildMitigationEffect(
     return null;
   }
 
-  const multiplier = getMitigationMultiplier(skill, elem);
+  const multiplier = getMitigationMultiplier(skill, elem, usage);
   const hasDeterministicMitigation = multiplier < 1 || immune;
 
   if (!hasDeterministicMitigation) {
@@ -171,7 +178,7 @@ export function buildTargetMitigationEffect(
     return null;
   }
 
-  const multiplier = getMitigationMultiplier(skill, elem);
+  const multiplier = getMitigationMultiplier(skill, elem, usage);
   const hasDeterministicMitigation = multiplier < 1 || immune;
 
   if (!hasDeterministicMitigation) {

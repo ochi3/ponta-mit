@@ -52,7 +52,7 @@ export interface Timeline {
   practice?: TimelinePracticeConfig;
 }
 
-export type RoleId = "tank" | "healer" | "melee" | "ranged" | "caster";
+export type RoleId = "tank" | "healer" | "melee" | "ranged" | "caster" | "utility";
 export type JobId = string;
 export type SkillId = string;
 export type JobSkillMode = "normal" | "evolve";
@@ -116,6 +116,8 @@ export interface SkillData {
 
   /** Manual stack/input skills such as scaling shields. */
   maxStacks?: number;
+  /** maxStacks セルに表示するラベル（インデックス=スタック数） */
+  stackDisplayLabels?: readonly string[];
 
   invuln?: true;
 

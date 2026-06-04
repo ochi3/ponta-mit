@@ -371,6 +371,10 @@ td.mp-col-freeze::after {
   background: linear-gradient(to bottom, #7f1d1d, #020617);
 }
 
+.mp-header-sticky tr:first-child th.mp-job-header--utility {
+  background: linear-gradient(to bottom, #4c1d95, #020617);
+}
+
 .mp-job-header--group {
   border-left-width: 2px;
   border-left-color: rgba(148, 163, 184, 0.65);

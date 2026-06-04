@@ -3,6 +3,8 @@ import { useStore } from "../state/store";
 import type { SkillData, JobId, PlanUsage } from "../types";
 import { type CellVisualState, getColorClass, getShapeClass } from "./cellStyles";
 import { getChargeCapacity, isChargeSkill } from "../logic/skillCharges";
+import { getStackShieldPct } from "../logic/getShieldPct";
+import { getEffectDurationS, getEffectMitigationPct } from "../logic/skillEffect";
 
 interface StackCellProps {
   jobId: JobId;
@@ -88,11 +90,31 @@ function StackCellComponent({
   ]);
 
   const isEmpty = color === "none" && shape === "none" && !checked;
-  const displayValue = checked && currentStacks > 0 ? String(currentStacks) : "";
+  const stackLabel =
+    checked && currentStacks > 0 && skill.stackDisplayLabels?.[currentStacks]
+      ? skill.stackDisplayLabels[currentStacks]
+      : checked && currentStacks > 0
+        ? String(currentStacks)
+        : "";
+  const displayValue = stackLabel;
   const usageLabel = chargeSkill
     ? `Use ${displayValue || "0"} / Ready ${availableChargeCount}`
     : `Stacks ${displayValue || "0"}`;
-  const title = `${skill.name} (${usageLabel})`;
+  const effectNote = (() => {
+    if (!checked || currentStacks <= 0) {
+      return "";
+    }
+    const duration = getEffectDurationS(skill, { stacks: currentStacks });
+    const mitPct = getEffectMitigationPct(skill, { stacks: currentStacks });
+    if (mitPct > 0) {
+      return ` ${duration}秒 軽減${Math.round(mitPct * 100)}%`;
+    }
+    if (skill.kinds.includes("shield")) {
+      return ` 盾${Math.round(getStackShieldPct(skill, { stacks: currentStacks }) * 100)}%`;
+    }
+    return duration > 0 ? ` ${duration}秒` : "";
+  })();
+  const title = `${skill.name} (${usageLabel})${effectNote}`;
   const actionLabel = checked ? "remove" : "set";
 
   return (

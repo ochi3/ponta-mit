@@ -275,6 +275,10 @@ body.theme-light .mp-header-sticky tr:first-child th.mp-job-header--dps {
   background: linear-gradient(to bottom, #f5c2c2, #f2f2f2);
 }
 
+body.theme-light .mp-header-sticky tr:first-child th.mp-job-header--utility {
+  background: linear-gradient(to bottom, #ddd6fe, #f2f2f2);
+}
+
 body.theme-light .mp-job-header--group {
   border-left-width: 2px;
   border-left-color: rgba(100, 116, 139, 0.45);

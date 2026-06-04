@@ -35,6 +35,7 @@ import {
   CUSTOM_SKILL_GROUPS,
   type CustomSkillRow,
 } from "./custom";
+import { SKILLS_UTILITY_UNKNOWN, SKILLS_UTILITY_UNKNOWN_SECONDARY } from "./utility";
 
 type SkillDataSet = {
   primary: readonly SkillData[];
@@ -82,6 +83,8 @@ const BASE_SKILL_GROUPS: readonly (readonly SkillData[])[] = [
   SKILLS_RANGED_MCH,
   SKILLS_CASTER_PCT,
   SKILLS_CASTER_RDM,
+  SKILLS_UTILITY_UNKNOWN,
+  SKILLS_UTILITY_UNKNOWN_SECONDARY,
 ];
 
 const BASE_SKILLS_BY_ID = new Map<SkillId, SkillData>(
@@ -196,6 +199,11 @@ const JOB_SKILL_GROUPS: Record<JobId, JobSkillDataGroup> = {
   "caster.pct": withEvolve("caster.pct", withCustomSkills("caster.pct", { primary: SKILLS_CASTER_PCT })),
   "caster.rdm": withEvolve("caster.rdm", withCustomSkills("caster.rdm", { primary: SKILLS_CASTER_RDM })),
   "caster.smn": withEvolve("caster.smn", withCustomSkills("caster.smn", { primary: [] })),
+
+  "utility.unknown": {
+    primary: SKILLS_UTILITY_UNKNOWN,
+    secondary: SKILLS_UTILITY_UNKNOWN_SECONDARY,
+  },
 };
 
 function toSkillIds(skills: Iterable<SkillData>) {

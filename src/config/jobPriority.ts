@@ -6,6 +6,7 @@ export const DEFAULT_JOB_PRIORITY: readonly JobId[] = [
   "melee.mnk","melee.drg","melee.nin","melee.sam","melee.rpr","melee.vpr",
   "ranged.brd","ranged.mch","ranged.dnc",
   "caster.blm","caster.smn","caster.rdm","caster.pct",
+  "utility.unknown",
 ] as const;
 
 export const JOB_RANK = Object.fromEntries(

@@ -31,6 +31,9 @@ const JOB_ENTRIES = [
   { id: "caster.smn", name: "召喚士", role: "caster" },
   { id: "caster.rdm", name: "赤魔道士", role: "caster" },
   { id: "caster.pct", name: "ピクトマンサー", role: "caster" },
+
+  // Utility
+  { id: "utility.unknown", name: "Unknown", role: "utility" },
 ] as const;
 
 export const JOBS: readonly Job[] = JOB_ENTRIES;

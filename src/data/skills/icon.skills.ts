@@ -42,6 +42,10 @@ import CASTER_ADDLE from "@/assets/icons/skills/caster/addle.png";
 import CASTER_RDM_MAGICK_BARRIER from "@/assets/icons/skills/caster.rdm/magick_barrier.png";
 import CASTER_PCT_TEMPERA_GRASSA from "@/assets/icons/skills/caster.pct/tempera_grassa.png";
 
+import UTILITY_UNKNOWN_BURST from "@/assets/icons/skills/utility.unknown/burst.png";
+import UTILITY_UNKNOWN_POTION from "@/assets/icons/skills/utility.unknown/potion.png";
+import UTILITY_UNKNOWN_LB from "@/assets/icons/skills/utility.unknown/lb.png";
+
 import HEALER_WHM_TEMPERANCE from "@/assets/icons/skills/healer.whm/temperance.png";
 import HEALER_WHM_DIVINE_CARESS from "@/assets/icons/skills/healer.whm/divine_caress.png";
 import HEALER_WHM_PLENARY_INDULGENCE from "@/assets/icons/skills/healer.whm/plenary_indulgence.png";
@@ -205,6 +209,10 @@ export const SKILL_ICON: Record<string, string> = {
   "caster.addle": CASTER_ADDLE,
   "caster.rdm.magick_barrier": CASTER_RDM_MAGICK_BARRIER,
   "caster.pct.tempera_grassa": CASTER_PCT_TEMPERA_GRASSA,
+  "utility.unknown.burst": UTILITY_UNKNOWN_BURST,
+  "utility.unknown.potion": UTILITY_UNKNOWN_POTION,
+  "utility.unknown.potion_2": UTILITY_UNKNOWN_POTION,
+  "utility.unknown.lb": UTILITY_UNKNOWN_LB,
 };
 
 export function getSkillIcon(skillId: string) {

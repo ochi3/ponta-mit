@@ -34,6 +34,7 @@ import {
   isUsageActiveAtPoint,
   summarizeMitigation,
 } from "../logic/mitigation";
+import { getEffectDurationS } from "../logic/skillEffect";
 import { validatePlan, type ValidationIssue } from "../logic/validation";
 import {
   buildAstDrawSlots,
@@ -1741,8 +1742,9 @@ export default function TimelineGrid({
             checkedRows.add(startRowIdx);
           }
 
-          if (dur > 0) {
-            const effectEndSec = u.t_sec + dur;
+          const usageDur = getEffectDurationS(col.skill, u);
+          if (usageDur > 0) {
+            const effectEndSec = u.t_sec + usageDur;
             const effectStartRow = findFirstRowAtOrAfter(u.t_sec);
             const effectEndRow = findFirstRowAtOrAfter(effectEndSec);
 
@@ -1754,7 +1756,7 @@ export default function TimelineGrid({
           }
 
           if (cd > 0) {
-            const cdStartSec = u.t_sec + dur;
+            const cdStartSec = u.t_sec + usageDur;
             const cdEndSec = u.t_sec + cd;
 
             if (cdStartSec < cdEndSec) {
@@ -2369,9 +2371,10 @@ export default function TimelineGrid({
                   const jobWidth = jobHeaderWidth.get(jobId) ?? `calc(${span} * ${SKILL_COL_CSS_VAR})`;
 
                   const rawRole = jobId.split(".")[0].toLowerCase();
-                  let roleGroup: "tank" | "healer" | "dps";
+                  let roleGroup: "tank" | "healer" | "dps" | "utility";
                   if (rawRole === "tank") roleGroup = "tank";
                   else if (rawRole === "healer") roleGroup = "healer";
+                  else if (rawRole === "utility") roleGroup = "utility";
                   else if (rawRole === "melee" ||rawRole === "ranged" ||rawRole === "caster") 
                     roleGroup = "dps";
                   else roleGroup = "dps";
