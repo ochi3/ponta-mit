@@ -270,25 +270,31 @@ export default function TopBar({
 
             <div className="flex flex-wrap items-center gap-2">
 
-                <button
-                    type="button"
-                    onClick={undo}
-                    disabled={undoCount === 0}
-                    className={copyButtonClass}
-                    title="ひとつ前の編集に戻します"
-                >
-                    戻す
-                </button>
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                        type="button"
+                        onClick={undo}
+                        disabled={undoCount === 0}
+                        className={copyButtonClass}
+                        title="ひとつ前の編集に戻します"
+                    >
+                        戻す
+                    </button>
 
-                <button
-                    type="button"
-                    onClick={redo}
-                    disabled={redoCount === 0}
-                    className={copyButtonClass}
-                    title="戻した編集をやり直します"
-                >
-                    やり直し
-                </button>
+                    <button
+                        type="button"
+                        onClick={redo}
+                        disabled={redoCount === 0}
+                        className={copyButtonClass}
+                        title="戻した編集をやり直します"
+                    >
+                        やり直し
+                    </button>
+
+                    <span className={`text-[11px] ${labelTone}`}>
+                        {t("topbar.cellClick")}
+                    </span>
+                </div>
 
                 <button type="button" onClick={handleGenerateLink} className={actionButtonClass}>
                     {t("topbar.actions.generateLink")}

@@ -8,6 +8,9 @@ export function uniqueSeconds(ms: Moment[]): number[] {
   return Array.from(seen).sort((a,b)=>a-b);
 }
 
+/** 戦闘前に遡れる最大秒数（-15秒まで） */
+export const PRE_BATTLE_TIMELINE_SEC = 15;
+
 export function formatSec(s: number) {
   const sign = s < 0 ? "-" : "";
   const abs  = Math.abs(s);
@@ -20,7 +23,11 @@ export function formatSec(s: number) {
     .padStart(2, "0")}`;
 }
 
-export function secondsInPhase(tl: Timeline, phaseId?: string): number[] {
+export function secondsInPhase(
+  tl: Timeline,
+  phaseId?: string,
+  usageSecs?: readonly number[]
+): number[] {
   let start = 0;
   let end = 0;
 
@@ -31,12 +38,23 @@ export function secondsInPhase(tl: Timeline, phaseId?: string): number[] {
       end = p.end_sec ?? (tl.moments.length > 0 ? Math.max(...tl.moments.map(m => m.t_sec)) : start);
     }
   } else {
-    // Total range
+    // Total range（0秒・戦闘前の負の秒を含める）
     if (tl.moments.length > 0) {
-      start = Math.min(...tl.moments.map(m => m.t_sec), ...tl.phases.map(p => p.start_sec));
+      start = Math.min(
+        0,
+        ...tl.moments.map((m) => m.t_sec),
+        ...tl.phases.map((p) => p.start_sec)
+      );
       end = Math.max(...tl.moments.map(m => m.t_sec), ...tl.phases.map(p => p.end_sec ?? 0));
     }
   }
+
+  const preBattleStart = -PRE_BATTLE_TIMELINE_SEC;
+  start = Math.min(start, preBattleStart);
+  if (usageSecs?.length) {
+    start = Math.min(start, ...usageSecs);
+  }
+  start = Math.max(preBattleStart, start);
 
   const result: number[] = [];
   for (let s = start; s <= end; s++) {

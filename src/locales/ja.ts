@@ -35,6 +35,7 @@ const ja = {
       baseLocale: "基準言語: {locale}",
       duty: "コンテンツ",
     },
+    cellClick: "左: ON/OFF　右: 終了行から開始へ逆算",
   },
   timeline: {
     headers: {

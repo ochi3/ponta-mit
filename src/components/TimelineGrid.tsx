@@ -35,6 +35,7 @@ import {
   summarizeMitigation,
 } from "../logic/mitigation";
 import { getEffectDurationS } from "../logic/skillEffect";
+import { getEffectStartPlacementFromEndClick } from "../logic/placeUsageAtEffectEnd";
 import { validatePlan, type ValidationIssue } from "../logic/validation";
 import {
   buildAstDrawSlots,
@@ -444,6 +445,7 @@ export default function TimelineGrid({
   const team = useStore((s) => s.team);
   const setTeam = useStore((s) => s.setTeam);
   const usages = useStore((s) => s.usages);
+  const addUsage = useStore((s) => s.addUsage);
   const momentNotes = useStore((s) => s.momentNotes);
   const setMomentNote = useStore((s) => s.setMomentNote);
   const layoutPrefs = useStore(
@@ -795,6 +797,39 @@ export default function TimelineGrid({
   }, [rows]);
 
   const rowToSec = useMemo(() => rows.map((row) => row.sec), [rows]);
+
+  function handleSkillCellContextMenu(
+    event: MouseEvent<HTMLTableCellElement>,
+    col: Col,
+    rowSec: number,
+    rowLineIndex: number,
+    disabled: boolean,
+    usageAtClick?: PlanUsage
+  ) {
+    event.preventDefault();
+    if (disabled) {
+      return;
+    }
+
+    const placement = getEffectStartPlacementFromEndClick(
+      col.skill,
+      rowSec,
+      rowLineIndex,
+      rows,
+      usageAtClick
+    );
+    if (!placement) {
+      return;
+    }
+
+    const { startSec, lineIndex, stacks } = placement;
+    const targetKey = `${col.jobId}::${col.skill.id}::${startSec}::${lineIndex}`;
+    if (usageIndex.has(targetKey)) {
+      return;
+    }
+
+    addUsage(col.jobId, col.skill.id, startSec, lineIndex, stacks);
+  }
 
   const usagesByJobSkill = useMemo(() => {
     const map = new Map<string, typeof usages>();
@@ -2662,13 +2697,36 @@ export default function TimelineGrid({
                         focusSecond === row.sec &&
                         focusLineIndex === row.lineIndex &&
                         focusSkillId === c.skill.id;
+                      const skipEffectEndPlacement =
+                        isAstDraw ||
+                        isSchAetherflow ||
+                        isSgeAddersgall ||
+                        isWhmLily ||
+                        isChargeSkill(c.skill);
+                      const effectEndTitle = skipEffectEndPlacement
+                        ? undefined
+                        : "右クリック: この行を効果の最終秒として開始へ逆算";
 
                       return (
                         <td
                           key={c.jobId + "::" + c.skill.id + "::" + row.sec + "::" + row.lineIndex}
                           data-cell-key={cellKey}
                           data-skill-id={c.skill.id}
-                          title={validationIssue?.message}
+                          title={
+                            validationIssue?.message
+                              ? validationIssue.message
+                              : effectEndTitle
+                          }
+                          onContextMenu={(event) =>
+                            handleSkillCellContextMenu(
+                              event,
+                              c,
+                              row.sec,
+                              row.lineIndex,
+                              skipEffectEndPlacement,
+                              cellUsage ?? exactUsage
+                            )
+                          }
                           className={`mp-cell mp-skill-cell ${hasStacks ? "mp-skill-cell--stack" : ""} ${isJobStart ? "mp-skill-cell--job-start" : ""} ${isJobEnd ? "mp-skill-cell--job-end" : ""} ${
                             validationIssue
                               ? `mp-cell--validation mp-cell--validation-${validationIssue.severity}`

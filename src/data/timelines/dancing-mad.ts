@@ -1,7 +1,7 @@
 import type { MechanismSlice, Timeline, Moment } from "../../types";
 
 export const MOMENTS_P1: Moment[] = [
-  { t_sec: -15,  name: "戦闘前", elem: "none", kind: "event" },
+  { t_sec: -15,  name: "15秒前", elem: "none", kind: "event" },
   { t_sec: 0, name: "戦闘開始！", elem: "none", kind: "event" },
   { t_sec: 3, name: "AA", elem: "physical", damage: 115000 },
   { t_sec: 6, name: "AA", elem: "physical", damage: 115000 },

@@ -35,6 +35,7 @@ const en = {
       baseLocale: "Base language: {locale}",
       duty: "Duty",
     },
+    cellClick: "L: toggle　R: place start from inclusive end row",
   },
   timeline: {
     headers: {

@@ -109,7 +109,6 @@ function resolvePracticeConfig(
 }
 
 export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
-  const seconds = useMemo(() => secondsInPhase(tl, undefined), [tl]);
   const [phaseNavFocus, setPhaseNavFocus] = useState<{
     t_sec: number;
     requestKey: number;
@@ -133,6 +132,10 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   } | null>(null);
   const team = useStore((s) => s.team);
   const usages = useStore((s) => s.usages);
+  const seconds = useMemo(
+    () => secondsInPhase(tl, undefined, usages.map((usage) => usage.t_sec)),
+    [tl, usages]
+  );
   const momentNotes = useStore((s) => s.momentNotes);
   const layoutPrefs = useStore((s) => s.plansByTimeline[tl.id]?.layoutPrefs);
   const expandedJobs = useStore((s) => s.expandedJobs);
@@ -164,7 +167,10 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     () => resolvePracticeConfig(roomPractice, contentPractice, tl.practice),
     [contentPractice, roomPractice, tl.practice]
   );
-  const practiceSeconds = useMemo(() => secondsInPhase(tl, undefined), [tl]);
+  const practiceSeconds = useMemo(
+    () => secondsInPhase(tl, undefined, usages.map((usage) => usage.t_sec)),
+    [tl, usages]
+  );
   const syncTargetOptions = useMemo(
     () =>
       listSyncTargetOptions(practiceConfig, team, (jobId) => {
