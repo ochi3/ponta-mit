@@ -8,6 +8,15 @@ import {
 } from "./whmLilies";
 import { simulateSgeAddersgall } from "./sgeAddersgall";
 
+/** 同一親召喚内の重複チェックを行わない子スキル */
+const CHILD_SKILL_IDS_SKIP_DUPLICATE_PER_PARENT = new Set<string>([
+  "healer.sch.consolation",
+]);
+
+function skipsDuplicateChildCheck(skillId: string): boolean {
+  return CHILD_SKILL_IDS_SKIP_DUPLICATE_PER_PARENT.has(skillId);
+}
+
 export type IssueSeverity = "error" | "warning" | "info";
 
 export type IssueType =
@@ -236,6 +245,10 @@ function validateParentChildRelationships(
           list.push(childUsage);
           childrenByParentActivation.set(parentKey, list);
         }
+      }
+
+      if (skipsDuplicateChildCheck(childSkill.id)) {
+        continue;
       }
 
       for (const [, children] of childrenByParentActivation) {

@@ -1833,7 +1833,8 @@ export default function TimelineGrid({
 
         // Track which child usages are duplicates (more than one per parent activation)
         const duplicateChildUsages = new Set<string>();
-        
+        const skipDuplicateChildCheck = col.skill.id === "healer.sch.consolation";
+
         for (const pu of parentUsages) {
           const parentStart = pu.t_sec;
           const parentEnd = parentStart + parentDuration;
@@ -1849,7 +1850,7 @@ export default function TimelineGrid({
           }
           
           // If more than one, mark all but the first as duplicates
-          if (childrenInThisParent.length > 1) {
+          if (!skipDuplicateChildCheck && childrenInThisParent.length > 1) {
             const sorted = childrenInThisParent.slice().sort((a, b) => {
               if (a.t_sec !== b.t_sec) return a.t_sec - b.t_sec;
               return a.lineIndex - b.lineIndex;
@@ -1867,9 +1868,8 @@ export default function TimelineGrid({
 
           // Check if the start is outside parent's active time
           const isOutsideParent = !parentActiveRows[startRowIdx];
-          // Check if this is a duplicate child usage
           const isDuplicate = duplicateChildUsages.has(`${cu.t_sec}::${cu.lineIndex}`);
-          
+
           if (isOutsideParent || isDuplicate) {
             // Mark ALL cells in this skill's duration as conflict
             const startSec = cu.t_sec;
