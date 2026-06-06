@@ -30,6 +30,18 @@
     grid-template-columns: minmax(320px, var(--mp-practice-left-w, 420px)) minmax(0, 1fr);
     align-items: start;
   }
+
+}
+
+.mp-event-cell--clickable {
+  cursor: pointer;
+  border-radius: 0.25rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.mp-event-cell--clickable:hover {
+  background: rgba(56, 189, 248, 0.12);
+  color: #7dd3fc;
 }
 
 @media (max-width: 767px) {

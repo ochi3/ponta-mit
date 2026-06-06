@@ -8,7 +8,14 @@ import type {
 
 export type PracticeSyncTarget = "base" | JobId;
 
-function clampSeconds(value: number) {
+function clampTimelineSec(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.floor(value);
+}
+
+function clampVideoSec(value: number) {
   if (!Number.isFinite(value)) {
     return 0;
   }
@@ -23,8 +30,8 @@ export function normalizeSyncPoints(syncPoints?: readonly VideoSyncPoint[]) {
       continue;
     }
 
-    const t_sec = clampSeconds(point.t_sec);
-    const video_sec = clampSeconds(point.video_sec);
+    const t_sec = clampTimelineSec(point.t_sec);
+    const video_sec = clampVideoSec(point.video_sec);
     byTimelineSecond.set(t_sec, { t_sec, video_sec });
   }
 
@@ -49,7 +56,7 @@ export function buildFullSyncPoints(
   extraPoints: readonly VideoSyncPoint[]
 ) {
   return normalizeSyncPoints([
-    { t_sec: 0, video_sec: clampSeconds(baseVideoSec) },
+    { t_sec: 0, video_sec: clampVideoSec(baseVideoSec) },
     ...extraPoints,
   ]);
 }
@@ -222,14 +229,52 @@ export function buildEffectiveSyncPoints(
   return [{ t_sec: 0, video_sec: fallbackVideoStartSec }];
 }
 
+/** 動画秒から、適用中の同期ポイントのインデックスを返す */
+export function findActiveSyncPointIndexForVideo(
+  syncPoints: readonly VideoSyncPoint[],
+  videoSec: number
+) {
+  let index = 0;
+  for (let i = 0; i < syncPoints.length; i++) {
+    if (syncPoints[i].video_sec <= videoSec + 0.2) {
+      index = i;
+    }
+  }
+  return index;
+}
+
+/** タイムライン秒から、対応する動画秒へ変換する */
+export function timelineSecToVideoSec(
+  timelineSec: number,
+  syncPoints: readonly VideoSyncPoint[],
+  fallbackVideoStartSec = 0
+) {
+  const points = buildEffectiveSyncPoints(syncPoints, fallbackVideoStartSec);
+  if (points.length === 0) {
+    return Math.max(0, timelineSec + fallbackVideoStartSec);
+  }
+
+  let activeIndex = 0;
+  for (let i = 0; i < points.length; i++) {
+    if (points[i].t_sec <= timelineSec) {
+      activeIndex = i;
+    } else {
+      break;
+    }
+  }
+
+  const activePoint = points[activeIndex];
+  return activePoint.video_sec + (timelineSec - activePoint.t_sec);
+}
+
 export function applySyncPointUpdate(
   practice: TimelinePracticeConfig,
   target: PracticeSyncTarget,
   timelineSec: number,
   videoSec: number
 ): TimelinePracticeConfig {
-  const t_sec = clampSeconds(timelineSec);
-  const video_sec = clampSeconds(videoSec);
+  const t_sec = clampTimelineSec(timelineSec);
+  const video_sec = clampVideoSec(videoSec);
 
   if (target === "base") {
     const nextPoints = normalizeSyncPoints([
@@ -259,7 +304,7 @@ export function applySyncPointRemoval(
   target: PracticeSyncTarget,
   timelineSec: number
 ): TimelinePracticeConfig {
-  const t_sec = clampSeconds(timelineSec);
+  const t_sec = clampTimelineSec(timelineSec);
 
   if (target === "base") {
     return {

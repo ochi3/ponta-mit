@@ -8,11 +8,13 @@ import {
 import { JOBS } from "../data/jobs/jobs.registry";
 import {
   buildEffectiveSyncPoints,
+  findActiveSyncPointIndexForVideo,
   getJobPracticeVideoUrl,
   getSyncPointsForTarget,
   resolvePracticeSyncTarget,
   resolvePracticeYoutubeUrl,
   resolvePracticeVideoSource,
+  timelineSecToVideoSec,
 } from "../logic/practiceVideo";
 import type {
   ThemeMode,
@@ -28,7 +30,7 @@ import {
 } from "../logic/practiceIconMode";
 import { getSkillIcon } from "../data/skills/icon.skills";
 
-type PracticeViewMode = "timeline" | "icons";
+export type PracticeViewMode = "timeline" | "icons";
 
 type Props = {
   theme: ThemeMode;
@@ -36,6 +38,7 @@ type Props = {
   currentTimelineSec: number | null;
   primaryJobId: JobId | null;
   viewMode: PracticeViewMode;
+  seekTimelineRequest?: { sec: number; requestKey: number } | null;
   onClose: () => void;
   onViewModeChange: (mode: PracticeViewMode) => void;
   onTimelineTimeChange: (timelineSec: number | null) => void;
@@ -54,25 +57,13 @@ const PLAYER_STATE_LABELS: Record<PlayerUiState, string> = {
   error: "エラー",
 };
 
-function findActiveSyncPointIndex(
-  syncPoints: readonly VideoSyncPoint[],
-  videoSec: number
-) {
-  let index = 0;
-  for (let i = 0; i < syncPoints.length; i++) {
-    if (syncPoints[i].video_sec <= videoSec + 0.2) {
-      index = i;
-    }
-  }
-  return index;
-}
-
 export default function PracticeModePanel({
   theme,
   practice,
   currentTimelineSec,
   primaryJobId,
   viewMode,
+  seekTimelineRequest,
   onClose,
   onViewModeChange,
   onTimelineTimeChange,
@@ -170,11 +161,11 @@ export default function PracticeModePanel({
     if (syncPoints.length === 0) {
       setCurrentVideoSec(videoSec);
       emitVideoTime(videoSec);
-      emitTimelineTime(Math.max(0, Math.floor(videoSec)));
+      emitTimelineTime(Math.floor(videoSec));
       return;
     }
 
-    const activeIndex = findActiveSyncPointIndex(syncPoints, videoSec);
+    const activeIndex = findActiveSyncPointIndexForVideo(syncPoints, videoSec);
     const activePoint = syncPoints[activeIndex];
     const nextPoint = syncPoints[activeIndex + 1];
     const timelineSec = activePoint.t_sec + (videoSec - activePoint.video_sec);
@@ -193,8 +184,36 @@ export default function PracticeModePanel({
 
     setCurrentVideoSec(videoSec);
     emitVideoTime(videoSec);
-    emitTimelineTime(Math.max(0, Math.floor(timelineSec)));
+    emitTimelineTime(Math.floor(timelineSec));
   }, [emitTimelineTime, emitVideoTime]);
+
+  const seekToTimelineSec = useCallback(
+    (timelineSec: number) => {
+      const player = playerRef.current;
+      if (!player) {
+        emitTimelineTime(timelineSec);
+        return;
+      }
+
+      const videoSec = timelineSecToVideoSec(
+        timelineSec,
+        syncPointsRef.current,
+        parsedVideo?.startSeconds ?? 0
+      );
+      player.seekTo(videoSec, true);
+      setCurrentVideoSec(videoSec);
+      emitVideoTime(videoSec);
+      emitTimelineTime(timelineSec);
+    },
+    [emitTimelineTime, emitVideoTime, parsedVideo?.startSeconds]
+  );
+
+  useEffect(() => {
+    if (!seekTimelineRequest) {
+      return;
+    }
+    seekToTimelineSec(seekTimelineRequest.sec);
+  }, [seekTimelineRequest, seekToTimelineSec]);
 
   useEffect(() => {
     if (!parsedVideo) {
@@ -330,9 +349,7 @@ export default function PracticeModePanel({
             <button
               type="button"
               onClick={() => onViewModeChange("timeline")}
-              className={
-                viewMode === "timeline" ? activeViewButtonClass : inactiveViewButtonClass
-              }
+              className={viewMode === "timeline" ? activeViewButtonClass : inactiveViewButtonClass}
             >
               タイムライン
             </button>
@@ -456,7 +473,7 @@ export default function PracticeModePanel({
         </div>
 
         <div className="mp-practice-video-frame overflow-hidden rounded-2xl border border-slate-800 bg-black">
-          <div className="aspect-video min-h-[220px] w-full bg-black">
+          <div className="aspect-video relative min-h-[220px] w-full bg-black">
             {parsedVideo ? (
               <div ref={playerHostRef} className="h-full w-full" />
             ) : (

@@ -123,6 +123,10 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   const [practiceVideoSec, setPracticeVideoSec] = useState<number | null>(null);
   const [practiceVideoPaneWidth, setPracticeVideoPaneWidth] = useState<number | null>(null);
   const [practiceViewMode, setPracticeViewMode] = useState<PracticeViewMode>("timeline");
+  const [practiceSeekRequest, setPracticeSeekRequest] = useState<{
+    sec: number;
+    requestKey: number;
+  } | null>(null);
   const [practiceExtraJobIds, setPracticeExtraJobIds] = useState<JobId[]>([]);
   const [editingSyncSecond, setEditingSyncSecond] = useState<number | null>(null);
   const [syncTarget, setSyncTarget] = useState<PracticeSyncTarget>("base");
@@ -636,6 +640,17 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     setEditingSyncSecond(sec);
   }
 
+  const handlePracticeEventClick = useCallback((sec: number) => {
+    startTransition(() => {
+      setPracticeTimelineSec(sec);
+      setPracticeSeekRequest({ sec, requestKey: Date.now() });
+    });
+  }, []);
+
+  const handlePracticeViewModeChange = useCallback((mode: PracticeViewMode) => {
+    setPracticeViewMode(mode);
+  }, []);
+
   function handleSyncTargetChange(target: PracticeSyncTarget) {
     setSyncTarget(target);
   }
@@ -750,8 +765,9 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
                   currentTimelineSec={practiceTimelineSec}
                   primaryJobId={practiceSelectedJobId}
                   viewMode={practiceViewMode}
+                  seekTimelineRequest={practiceSeekRequest}
                   onClose={closePracticeMode}
-                  onViewModeChange={setPracticeViewMode}
+                  onViewModeChange={handlePracticeViewModeChange}
                   onTimelineTimeChange={handlePracticeTimelineTimeChange}
                   onVideoTimeChange={handlePracticeVideoTimeChange}
                   onVideoSourceChange={handlePracticeVideoSourceChange}
@@ -789,6 +805,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
                     scrollRequestKey={phaseScrollRequestKey}
                     followTime
                     onTimeClick={handleTimeClick}
+                    onEventClick={handlePracticeEventClick}
                     syncSeconds={syncSeconds}
                   />
                 )}

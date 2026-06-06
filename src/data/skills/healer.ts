@@ -154,6 +154,7 @@ export const SKILLS_HEALER_AST = [
     magic_pct: 0.9,
     unique_pct: 1,
     parentSkillId: "healer.ast.neutral_sect",
+    parentGracePeriod_s: 30,
     icon: SKILL_ICON["healer.ast.sun_sign"],
   },
   {

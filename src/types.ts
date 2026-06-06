@@ -124,6 +124,8 @@ export interface SkillData {
   icon?: IconRef;
 
   parentSkillId?: SkillId;
+  /** 親スキル効果終了後も子スキルを実行できる猶予（秒） */
+  parentGracePeriod_s?: number;
   /** Evolve-mode variants can reuse a base skill's display data with different tuning. */
   evolveBaseSkillId?: SkillId;
 }

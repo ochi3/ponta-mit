@@ -7,6 +7,7 @@ import {
   simulateWhmLilies,
 } from "./whmLilies";
 import { simulateSgeAddersgall } from "./sgeAddersgall";
+import { isChildWithinParentWindow } from "./parentChildSkills";
 
 /** 同一親召喚内の重複チェックを行わない子スキル */
 const CHILD_SKILL_IDS_SKIP_DUPLICATE_PER_PARENT = new Set<string>([
@@ -143,23 +144,6 @@ function validateCooldownConflicts(
   return issues;
 }
 
-function isWithinParentDuration(
-  childUsage: PlanUsage,
-  parentUsage: PlanUsage,
-  parentDuration: number
-): boolean {
-  const parentStart = parentUsage.t_sec;
-  const parentEnd = parentStart + parentDuration;
-
-  if (childUsage.t_sec > parentStart && childUsage.t_sec <= parentEnd) {
-    return true;
-  }
-  if (childUsage.t_sec === parentStart && childUsage.lineIndex >= parentUsage.lineIndex) {
-    return true;
-  }
-  return false;
-}
-
 function validateParentChildRelationships(
   indexes: ValidationIndexes
 ): ValidationIssue[] {
@@ -198,7 +182,7 @@ function validateParentChildRelationships(
         let nearestParent: PlanUsage | undefined;
 
         for (const pu of parentUsages) {
-          if (isWithinParentDuration(childUsage, pu, parentDuration)) {
+          if (isChildWithinParentWindow(childUsage, pu, parentDuration, childSkill)) {
             foundParent = pu;
             break;
           }

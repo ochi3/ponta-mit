@@ -36,6 +36,10 @@ import {
 } from "../logic/mitigation";
 import { getEffectDurationS } from "../logic/skillEffect";
 import { getEffectStartPlacementFromEndClick } from "../logic/placeUsageAtEffectEnd";
+import {
+  getParentChildWindowEndSec,
+  isChildWithinParentWindow,
+} from "../logic/parentChildSkills";
 import { validatePlan, type ValidationIssue } from "../logic/validation";
 import {
   buildAstDrawSlots,
@@ -417,6 +421,7 @@ export default function TimelineGrid({
   focusSecond,
   followTime = false,
   onTimeClick,
+  onEventClick,
   syncSeconds,
   focusLineIndex,
   focusSkillId,
@@ -431,6 +436,8 @@ export default function TimelineGrid({
   focusSecond?: number | null;
   followTime?: boolean;
   onTimeClick?: (sec: number) => void;
+  /** 動画モード: イベント名クリックで動画をシーク */
+  onEventClick?: (sec: number) => void;
   syncSeconds?: readonly number[];
   focusLineIndex?: number | null;
   focusSkillId?: string | null;
@@ -1088,8 +1095,14 @@ export default function TimelineGrid({
             const rowSec = row.sec;
             
             // Move pointer forward past usages that have ended
-            while (puIdx < sortedParentUsages.length && 
-                   sortedParentUsages[puIdx].t_sec + parentDuration < rowSec) {
+            while (
+              puIdx < sortedParentUsages.length &&
+              getParentChildWindowEndSec(
+                sortedParentUsages[puIdx].t_sec,
+                parentDuration,
+                col.skill
+              ) < rowSec
+            ) {
               puIdx++;
             }
             
@@ -1100,7 +1113,7 @@ export default function TimelineGrid({
               if (pu.t_sec > rowSec) break;
               
               const startSec = pu.t_sec;
-              const endSec = startSec + parentDuration;
+              const endSec = getParentChildWindowEndSec(startSec, parentDuration, col.skill);
               
               if (rowSec > startSec && rowSec <= endSec) {
                 parentActiveRows[r] = true;
@@ -1836,15 +1849,10 @@ export default function TimelineGrid({
         const skipDuplicateChildCheck = col.skill.id === "healer.sch.consolation";
 
         for (const pu of parentUsages) {
-          const parentStart = pu.t_sec;
-          const parentEnd = parentStart + parentDuration;
-          
-          // Find all child usages within this parent's duration
+          // Find all child usages within this parent's duration (+ grace period)
           const childrenInThisParent: typeof usages = [];
           for (const cu of skillUsages) {
-            if (cu.t_sec > parentStart && cu.t_sec <= parentEnd) {
-              childrenInThisParent.push(cu);
-            } else if (cu.t_sec === parentStart && cu.lineIndex >= pu.lineIndex) {
+            if (isChildWithinParentWindow(cu, pu, parentDuration, col.skill)) {
               childrenInThisParent.push(cu);
             }
           }
@@ -2354,7 +2362,11 @@ export default function TimelineGrid({
   return (
     <div className="w-full">
       <div className="w-full px-2 mp-shell">
-        <div ref={wrapperRef} className="rounded mp-wrapper" style={tableLayoutStyle}>
+        <div
+          ref={wrapperRef}
+          className="rounded mp-wrapper"
+          style={tableLayoutStyle}
+        >
           <table className="mp-table text-sm border-collapse">
             <thead className="mp-header-sticky">
               <tr>
@@ -2609,12 +2621,24 @@ export default function TimelineGrid({
                       title={[
                         row.line.label,
                         ...(moment?.tags ?? []).map((tag) => MOMENT_TAG_LABELS[tag] ?? tag),
+                        onEventClick ? "クリックで動画をジャンプ" : "",
                       ].filter(Boolean).join(" / ")}
                     >
-                      <div className="mp-event-cell">
-                        {renderMomentTags(moment)}
-                        <span className="mp-event-name">{row.line.label || "—"}</span>
-                      </div>
+                      {onEventClick && row.line.label ? (
+                        <button
+                          type="button"
+                          onClick={() => onEventClick(row.sec)}
+                          className="mp-event-cell mp-event-cell--clickable w-full text-left"
+                        >
+                          {renderMomentTags(moment)}
+                          <span className="mp-event-name">{row.line.label}</span>
+                        </button>
+                      ) : (
+                        <div className="mp-event-cell">
+                          {renderMomentTags(moment)}
+                          <span className="mp-event-name">{row.line.label || "—"}</span>
+                        </div>
+                      )}
                     </td>
                     <td
                       className="p-1 mp-col-memo mp-col-freeze mp-col-freeze--middle"
