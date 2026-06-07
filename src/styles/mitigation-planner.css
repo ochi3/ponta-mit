@@ -33,6 +33,24 @@
 
 }
 
+.mp-time-header-toggle {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s ease;
+}
+
+.mp-time-header-toggle:hover {
+  color: #7dd3fc;
+}
+
 .mp-event-cell--clickable {
   cursor: pointer;
   border-radius: 0.25rem;
@@ -482,6 +500,17 @@ td.mp-col-freeze::after {
   border-radius: 0.3rem;
   box-shadow: none;
   object-fit: cover;
+}
+
+.mp-skill-icon--dev-copy,
+.mp-skill-fallback--dev-copy {
+  cursor: pointer;
+}
+
+.mp-skill-icon--dev-copy:hover,
+.mp-skill-fallback--dev-copy:hover {
+  outline: 1px solid rgba(125, 211, 252, 0.65);
+  outline-offset: 1px;
 }
 
 /* Fallback text label when no icon exists */

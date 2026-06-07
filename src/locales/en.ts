@@ -41,6 +41,8 @@ const en = {
     headers: {
       mechanism: "Mech",
       time: "Time",
+      timeToggleToSeconds: "Click to show seconds",
+      timeToggleToClock: "Click to show mm:ss",
       event: "Event",
       memo: "Memo",
       element: "Type",

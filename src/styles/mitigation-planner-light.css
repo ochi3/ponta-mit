@@ -376,6 +376,17 @@ body.theme-light .mp-skill-icon {
   object-fit: cover;
 }
 
+body.theme-light .mp-skill-icon--dev-copy,
+body.theme-light .mp-skill-fallback--dev-copy {
+  cursor: pointer;
+}
+
+body.theme-light .mp-skill-icon--dev-copy:hover,
+body.theme-light .mp-skill-fallback--dev-copy:hover {
+  outline: 1px solid rgba(14, 116, 144, 0.45);
+  outline-offset: 1px;
+}
+
 /* Fallback text label when no icon exists */
 body.theme-light .mp-skill-fallback {
   display: block;
@@ -908,6 +919,10 @@ body.theme-light td.mp-col-mechanism.mp-col-freeze::after {
 body.theme-light .mp-mechanism-cell {
   color: #0f172a;
   background: #f2f2f2;
+}
+
+body.theme-light .mp-time-header-toggle:hover {
+  color: #0369a1;
 }
 
 body.theme-light .mp-event-cell--clickable:hover {

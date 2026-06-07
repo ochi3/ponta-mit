@@ -18,7 +18,12 @@ import SchAetherflowCell from "./SchAetherflowCell";
 import SgeAddersgallCell from "./SgeAddersgallCell";
 import WhmLilyCell from "./WhmLilyCell";
 import StackCell from "./StackCell";
-import { formatSec } from "../logic/timelineView";
+import {
+  formatTimelineSec,
+  loadTimelineTimeDisplayMode,
+  saveTimelineTimeDisplayMode,
+  type TimelineTimeDisplayMode,
+} from "../logic/timelineView";
 import { resolveMomentNote } from "../logic/momentNotes";
 import {
   clampMemoColumnWidth,
@@ -463,6 +468,9 @@ export default function TimelineGrid({
   const [memoWidthOverridePx, setMemoWidthOverridePx] = useState<number | null>(
     null
   );
+  const [timeDisplayMode, setTimeDisplayMode] = useState<TimelineTimeDisplayMode>(
+    loadTimelineTimeDisplayMode
+  );
   const activeMemoWidthPx = memoWidthOverridePx ?? memoWidthPx;
   const tableLayoutStyle = useMemo(
     () =>
@@ -481,12 +489,39 @@ export default function TimelineGrid({
   const [draggingJobId, setDraggingJobId] = useState<JobId | null>(null);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
   const [damagePopover, setDamagePopover] = useState<DamagePopoverState | null>(null);
+  const [astCopyFeedback, setAstCopyFeedback] = useState<{
+    skillId: string;
+    message: string;
+  } | null>(null);
   const hasMechanisms = Boolean(tl.mechanisms?.length);
 
   const syncSecondsSet = useMemo(
     () => new Set(syncSeconds ?? []),
     [syncSeconds]
   );
+
+  function toggleTimeDisplayMode() {
+    setTimeDisplayMode((prev) => {
+      const next = prev === "clock" ? "seconds" : "clock";
+      saveTimelineTimeDisplayMode(next);
+      return next;
+    });
+  }
+
+  async function handleAstSkillIconClick(skillId: string, skillName: string) {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    const { copyAstReactionCode } = await import("../logic/astReactionDev");
+    const result = await copyAstReactionCode(skillId, skillName);
+    setAstCopyFeedback({ skillId, message: result.message });
+    window.setTimeout(() => {
+      setAstCopyFeedback((current) =>
+        current?.skillId === skillId ? null : current
+      );
+    }, 3000);
+  }
   const visibleTeam = useMemo(
     () => (jobFilter ? team.filter((jobId) => jobId === jobFilter) : team),
     [jobFilter, team]
@@ -2219,7 +2254,7 @@ export default function TimelineGrid({
         }}
       >
         <div className="mp-mitigation-popover-title">
-          {formatSec(row.sec)} {row.line.label || "ダメージ"}
+          {formatTimelineSec(row.sec, timeDisplayMode)} {row.line.label || "ダメージ"}
         </div>
         <div className="mp-mitigation-popover-grid">
           {typeof moment.damage === "number" && (
@@ -2384,7 +2419,20 @@ export default function TimelineGrid({
                   }`}
                   rowSpan={2}
                   style={freezeStyle(freezeOffsets.time)}>
-                  {t("timeline.headers.time")}
+                  <button
+                    type="button"
+                    onClick={toggleTimeDisplayMode}
+                    className="mp-time-header-toggle"
+                    title={
+                      timeDisplayMode === "clock"
+                        ? t("timeline.headers.timeToggleToSeconds")
+                        : t("timeline.headers.timeToggleToClock")
+                    }
+                  >
+                    {timeDisplayMode === "clock"
+                      ? t("timeline.headers.time")
+                      : `${t("timeline.headers.time")}(秒)`}
+                  </button>
                 </th>
                 <th
                   className="p-2 text-left mp-col-event mp-col-freeze mp-col-freeze--middle"
@@ -2519,6 +2567,14 @@ export default function TimelineGrid({
                     (typeof c.skill.maxStacks === "number" && c.skill.maxStacks > 0);
                   const isJobStart = ci === 0 || cols[ci - 1]?.jobId !== c.jobId;
                   const isJobEnd = ci === cols.length - 1 || cols[ci + 1]?.jobId !== c.jobId;
+                  const isAstDevCopy =
+                    import.meta.env.DEV && c.jobId === "healer.ast";
+                  const iconTitle =
+                    astCopyFeedback?.skillId === c.skill.id
+                      ? astCopyFeedback.message
+                      : isAstDevCopy
+                        ? `${skillName}（クリックで反応マクロをコピー）`
+                        : skillName;
                   return (
                     <th
                       key={c.jobId + "::" + c.skill.id}
@@ -2527,15 +2583,39 @@ export default function TimelineGrid({
                       <div className="mp-skill-header-inner">
                         {icon ? (
                           <img
-                            className="mp-skill-icon"
+                            className={`mp-skill-icon${isAstDevCopy ? " mp-skill-icon--dev-copy" : ""}`}
                             src={icon}
                             alt={skillName}
-                            title={skillName}
+                            title={iconTitle}
+                            onClick={
+                              isAstDevCopy
+                                ? () => {
+                                    void handleAstSkillIconClick(
+                                      c.skill.id,
+                                      skillName
+                                    );
+                                  }
+                                : undefined
+                            }
                           />
                         ) : (
                           <span
-                            className="mp-skill-fallback"
-                            title={skillName}
+                            className={
+                              isAstDevCopy
+                                ? "mp-skill-fallback mp-skill-fallback--dev-copy"
+                                : "mp-skill-fallback"
+                            }
+                            title={iconTitle}
+                            onClick={
+                              isAstDevCopy
+                                ? () => {
+                                    void handleAstSkillIconClick(
+                                      c.skill.id,
+                                      skillName
+                                    );
+                                  }
+                                : undefined
+                            }
                           >
                             {skillName}
                           </span>
@@ -2592,7 +2672,7 @@ export default function TimelineGrid({
                             className="flex w-full items-center gap-1 text-left hover:text-sky-400"
                             title="同期ポイントを設定"
                           >
-                            <span>{formatSec(row.sec)}</span>
+                            <span>{formatTimelineSec(row.sec, timeDisplayMode)}</span>
                             {syncSecondsSet.has(row.sec) && (
                               <span
                                 className="inline-block h-2 w-2 rounded-full bg-sky-400"
@@ -2602,7 +2682,7 @@ export default function TimelineGrid({
                           </button>
                         ) : (
                           <span className="flex items-center gap-1">
-                            <span>{formatSec(row.sec)}</span>
+                            <span>{formatTimelineSec(row.sec, timeDisplayMode)}</span>
                             {syncSecondsSet.has(row.sec) && (
                               <span
                                 className="inline-block h-2 w-2 rounded-full bg-sky-400"

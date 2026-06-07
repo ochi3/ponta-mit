@@ -11,16 +11,46 @@ export function uniqueSeconds(ms: Moment[]): number[] {
 /** 戦闘前に遡れる最大秒数（-15秒まで） */
 export const PRE_BATTLE_TIMELINE_SEC = 15;
 
+export type TimelineTimeDisplayMode = "clock" | "seconds";
+
+const TIME_DISPLAY_MODE_STORAGE_KEY = "mp-time-display-mode";
+
 export function formatSec(s: number) {
   const sign = s < 0 ? "-" : "";
-  const abs  = Math.abs(s);
+  const abs = Math.abs(s);
 
-  const m  = Math.floor(abs / 60);
+  const m = Math.floor(abs / 60);
   const ss = abs % 60;
 
   return `${sign}${m.toString().padStart(2, "0")}:${ss
     .toString()
     .padStart(2, "0")}`;
+}
+
+export function formatTimelineSec(
+  s: number,
+  mode: TimelineTimeDisplayMode = "clock"
+): string {
+  if (mode === "seconds") {
+    return String(s);
+  }
+  return formatSec(s);
+}
+
+export function loadTimelineTimeDisplayMode(): TimelineTimeDisplayMode {
+  if (typeof window === "undefined") {
+    return "clock";
+  }
+  return window.localStorage.getItem(TIME_DISPLAY_MODE_STORAGE_KEY) === "seconds"
+    ? "seconds"
+    : "clock";
+}
+
+export function saveTimelineTimeDisplayMode(mode: TimelineTimeDisplayMode) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(TIME_DISPLAY_MODE_STORAGE_KEY, mode);
 }
 
 export function secondsInPhase(

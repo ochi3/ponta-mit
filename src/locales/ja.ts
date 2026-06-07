@@ -41,6 +41,8 @@ const ja = {
     headers: {
       mechanism: "ギミック",
       time: "時間",
+      timeToggleToSeconds: "クリックで秒数表示に切替",
+      timeToggleToClock: "クリックで時:分表示に切替",
       event: "イベント",
       memo: "メモ",
       element: "属性",

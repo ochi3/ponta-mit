@@ -23,30 +23,61 @@ function resolveBasePath(env: Record<string, string>) {
 }
 
 const maintenancePluginPath = path.resolve(__dirname, 'devtools/maintenancePlugin.ts')
+const astReactionPluginPath = path.resolve(__dirname, 'devtools/astReactionPlugin.ts')
 
 type MaintenanceModule = {
   maintenanceDevToolsPlugin: () => Plugin
 }
 
-async function loadMaintenancePlugins(mode: string): Promise<Plugin[]> {
-  if (mode !== 'development' || !existsSync(maintenancePluginPath)) {
+type AstReactionModule = {
+  astReactionDevToolsPlugin: () => Plugin
+}
+
+async function loadDevOnlyPlugins(mode: string): Promise<Plugin[]> {
+  if (mode !== 'development') {
     return []
   }
 
-  const module = (await import(
-    pathToFileURL(maintenancePluginPath).href
-  )) as MaintenanceModule
+  const plugins: Plugin[] = []
 
-  return [module.maintenanceDevToolsPlugin()]
+  if (existsSync(maintenancePluginPath)) {
+    try {
+      const module = (await import(
+        pathToFileURL(maintenancePluginPath).href
+      )) as MaintenanceModule
+      plugins.push(module.maintenanceDevToolsPlugin())
+    } catch (error) {
+      console.warn(
+        '[vite] maintenance dev plugin を読み込めませんでした:',
+        error instanceof Error ? error.message : error
+      )
+    }
+  }
+
+  if (existsSync(astReactionPluginPath)) {
+    try {
+      const module = (await import(
+        pathToFileURL(astReactionPluginPath).href
+      )) as AstReactionModule
+      plugins.push(module.astReactionDevToolsPlugin())
+    } catch (error) {
+      console.warn(
+        '[vite] AST reaction dev plugin を読み込めませんでした:',
+        error instanceof Error ? error.message : error
+      )
+    }
+  }
+
+  return plugins
 }
 
 export default defineConfig(async ({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const maintenancePlugins = await loadMaintenancePlugins(mode)
+  const devOnlyPlugins = await loadDevOnlyPlugins(mode)
 
   return {
     base: resolveBasePath(env),
-    plugins: [...maintenancePlugins, react(), tailwindcss()],
+    plugins: [...devOnlyPlugins, react(), tailwindcss()],
     build: {
       rollupOptions: {
         output: {
