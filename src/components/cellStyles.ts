@@ -32,3 +32,35 @@ const SHAPE_CLASS: Record<CellShape, string> = {
 };
 export const getShapeClass = (shape: CellShape) => SHAPE_CLASS[shape];
 
+/** 連続する同色セルを start / middle / end にまとめる */
+export function applyBarShapes(columnVisual: CellVisualState[]) {
+  let runStart = -1;
+
+  for (let r = 0; r <= columnVisual.length; r++) {
+    const isActive = r < columnVisual.length && columnVisual[r].color !== "none";
+
+    if (isActive) {
+      if (runStart === -1) {
+        runStart = r;
+      }
+      continue;
+    }
+
+    if (runStart === -1) {
+      continue;
+    }
+
+    const runEnd = r - 1;
+    if (runStart === runEnd) {
+      columnVisual[runStart].shape = "alone";
+    } else {
+      columnVisual[runStart].shape = "start";
+      columnVisual[runEnd].shape = "end";
+      for (let k = runStart + 1; k <= runEnd - 1; k++) {
+        columnVisual[k].shape = "middle";
+      }
+    }
+    runStart = -1;
+  }
+}
+

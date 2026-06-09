@@ -9,13 +9,18 @@ export async function copyAstReactionCode(
   skillName: string
 ): Promise<AstReactionCopyResult> {
   const params = new URLSearchParams({ skillId, name: skillName });
-  const response = await fetch(`/__dev/ast-reaction-code?${params.toString()}`);
+  // 同一 URL の GET がブラウザキャッシュされると更新前のコードが返るため毎回無効化する
+  params.set("_", String(Date.now()));
+  const response = await fetch(`/__dev/ast-reaction-code?${params.toString()}`, {
+    cache: "no-store",
+  });
 
   let payload: {
     code?: string;
     excelName?: string;
     error?: string;
     hint?: string;
+    sourceMtime?: string;
   } = {};
   try {
     payload = (await response.json()) as typeof payload;
@@ -38,5 +43,6 @@ export async function copyAstReactionCode(
   }
 
   const label = payload.excelName ?? skillName;
-  return { ok: true, message: `「${label}」の反応マクロをコピーしました。` };
+  const updatedAt = payload.sourceMtime ? `（定義ファイル更新: ${payload.sourceMtime}）` : "";
+  return { ok: true, message: `「${label}」の反応マクロをコピーしました。${updatedAt}` };
 }

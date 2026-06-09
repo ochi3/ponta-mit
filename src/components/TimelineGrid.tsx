@@ -13,6 +13,7 @@ import type {
   MomentTag,
 } from "../types";
 import Cell, { type CellVisualState } from "./Cell";
+import { applyBarShapes } from "./cellStyles";
 import AstDrawCell from "./AstDrawCell";
 import SchAetherflowCell from "./SchAetherflowCell";
 import SgeAddersgallCell from "./SgeAddersgallCell";
@@ -1211,6 +1212,7 @@ export default function TimelineGrid({
           vis[ci][r] = { color, checked, shape: "none" };
         }
 
+        applyBarShapes(vis[ci]);
         continue;
       }
 
@@ -1359,6 +1361,7 @@ export default function TimelineGrid({
           vis[ci][r] = { color, checked, shape: "none" };
         }
 
+        applyBarShapes(vis[ci]);
         continue;
       }
 
@@ -1383,6 +1386,7 @@ export default function TimelineGrid({
           };
         }
 
+        applyBarShapes(vis[ci]);
         continue;
       }
 
@@ -1479,6 +1483,7 @@ export default function TimelineGrid({
           };
         }
 
+        applyBarShapes(vis[ci]);
         continue;
       }
 
@@ -1502,6 +1507,7 @@ export default function TimelineGrid({
           };
         }
 
+        applyBarShapes(vis[ci]);
         continue;
       }
 
@@ -1598,6 +1604,7 @@ export default function TimelineGrid({
           };
         }
 
+        applyBarShapes(vis[ci]);
         continue;
       }
 
@@ -1634,6 +1641,7 @@ export default function TimelineGrid({
           };
         }
 
+        applyBarShapes(vis[ci]);
         continue;
       }
 
@@ -1730,6 +1738,7 @@ export default function TimelineGrid({
           };
         }
 
+        applyBarShapes(vis[ci]);
         continue;
       }
 
@@ -1928,27 +1937,7 @@ export default function TimelineGrid({
         }
       }
 
-      // 按行序列算条形 shape（run start/middle/end）
-      let runStart = -1;
-      for (let r = 0; r <= rows.length; r++) {
-        const isActive = r < rows.length && vis[ci][r].color !== "none";
-
-        if (isActive) {
-          if (runStart === -1) runStart = r;
-        } else if (runStart !== -1) {
-          const runEnd = r - 1;
-          if (runStart === runEnd) {
-            vis[ci][runStart].shape = "alone";
-          } else {
-            vis[ci][runStart].shape = "start";
-            vis[ci][runEnd].shape = "end";
-            for (let k = runStart + 1; k <= runEnd - 1; k++) {
-              vis[ci][k].shape = "middle";
-            }
-          }
-          runStart = -1;
-        }
-      }
+      applyBarShapes(vis[ci]);
     }
 
     return vis;

@@ -41,7 +41,7 @@ function fmtMoment(moment) {
   return `  { ${fields.join(", ")} },`;
 }
 
-function buildMoments(lines, { usePhaseTime, phaseStartAbs }) {
+function buildMoments(lines, { usePhaseTime }) {
   const moments = [];
   const orderBySec = new Map();
 
@@ -55,7 +55,7 @@ function buildMoments(lines, { usePhaseTime, phaseStartAbs }) {
     let elem;
     let damageText;
 
-    if (/^P[123]$/.test(parts[0])) continue;
+    if (/^P[1-5]$/.test(parts[0])) continue;
 
     if (/^\d{2}:\d{2}$/.test(parts[0]) && /^\d{2}:\d{2}$/.test(parts[1])) {
       t_sec = parseTime(parts[0]);
@@ -73,17 +73,14 @@ function buildMoments(lines, { usePhaseTime, phaseStartAbs }) {
       continue;
     }
 
-    if (phaseStartAbs !== undefined && phase_t_sec !== undefined) {
-      // sanity: absolute should match phase start + phase_t_sec when provided
-      void phaseStartAbs;
-    }
+    if (!name) continue;
 
     const order = (orderBySec.get(t_sec) ?? 0) + 1;
     orderBySec.set(t_sec, order);
 
     const moment = {
       t_sec,
-      ...(phase_t_sec !== undefined ? { phase_t_sec } : {}),
+      ...(usePhaseTime && phase_t_sec !== undefined ? { phase_t_sec } : {}),
       name,
       elem: parseElem(elem),
       ...(order > 1 ? { order } : {}),
@@ -103,7 +100,7 @@ function buildMoments(lines, { usePhaseTime, phaseStartAbs }) {
       moment.note = damageText.trim();
       moment.kind = "event";
     } else if (moment.elem === "unique" || !elem || parseElem(elem) === "none") {
-      moment.kind = moment.elem === "unique" ? "event" : "event";
+      moment.kind = "event";
     }
 
     if (moment.elem === "none" && !moment.kind) {
@@ -138,29 +135,46 @@ function fmtMechanisms(items) {
     .join("\n");
 }
 
-const sections = raw.split(/^P([123])$/m);
-const p1Lines = (sections[2] ?? "").trim().split("\n").filter(Boolean);
-const p2Lines = (sections[4] ?? "").trim().split("\n").filter(Boolean);
-const p3Lines = (sections[6] ?? "").trim().split("\n").filter(Boolean);
+function splitPhaseSections(source) {
+  const sections = new Map();
+  const parts = source.split(/^P([1-5])$/m);
+  for (let i = 1; i < parts.length; i += 2) {
+    const phaseNum = parts[i];
+    const body = (parts[i + 1] ?? "").trim();
+    sections.set(
+      `p${phaseNum}`,
+      body.split("\n").map((line) => line.trimEnd()).filter(Boolean)
+    );
+  }
+  return sections;
+}
 
-const momentsP1 = [
-  { t_sec: -15, name: "戦闘前", elem: "none", kind: "event" },
-  ...buildMoments(p1Lines, { usePhaseTime: false }),
-];
-const momentsP2 = buildMoments(p2Lines, { usePhaseTime: true, phaseStartAbs: 197 });
-const momentsP3 = buildMoments(p3Lines, { usePhaseTime: true, phaseStartAbs: 382 });
+const phaseSections = splitPhaseSections(raw);
 
 const P1_END = 202;
 const P2_START = 197;
 const P2_END = 387;
 const P3_START = 382;
 const P3_END = 734;
+const P4_START = 734;
+const P4_END = 868;
+const P5_START = 862;
+const P5_END = 1122;
+
+const momentsP1 = [
+  { t_sec: -15, name: "戦闘前", elem: "none", kind: "event" },
+  ...buildMoments(phaseSections.get("p1") ?? [], { usePhaseTime: false }),
+];
+const momentsP2 = buildMoments(phaseSections.get("p2") ?? [], { usePhaseTime: true });
+const momentsP3 = buildMoments(phaseSections.get("p3") ?? [], { usePhaseTime: true });
+const momentsP4 = buildMoments(phaseSections.get("p4") ?? [], { usePhaseTime: true });
+const momentsP5 = buildMoments(phaseSections.get("p5") ?? [], { usePhaseTime: true });
 
 const mechanismsP1 = [
   { name: "開幕", phaseId: "p1", start_sec: -15, end_sec: 28 },
   { name: "神々の像 (魔神)", phaseId: "p1", start_sec: 29, end_sec: 79 },
-  { name: "神々の像 (鬼神)", phaseId: "p1", start_sec: 80, end_sec: 163 },
-  { name: "神々の像 (女神)", phaseId: "p1", start_sec: 164, end_sec: P1_END },
+  { name: "神々の像 (鬼神)", phaseId: "p1", start_sec: 80, end_sec: 140 },
+  { name: "神々の像 (女神)", phaseId: "p1", start_sec: 141, end_sec: P1_END },
 ];
 
 const mechanismsP2 = [
@@ -176,6 +190,22 @@ const mechanismsP3 = [
   { name: "じしん & ブラックホール", phaseId: "p3", start_sec: 545, end_sec: 699 },
   { name: "どんどこ地団駄", phaseId: "p3", start_sec: 700, end_sec: 717 },
   { name: "時間切れまで", phaseId: "p3", start_sec: 718, end_sec: P3_END },
+];
+
+const mechanismsP4 = [
+  { name: "開幕", phaseId: "p4", start_sec: P4_START, end_sec: 758 },
+  { name: "真偽記憶フェーズ", phaseId: "p4", start_sec: 759, end_sec: 804 },
+  { name: "デバフ解放フェーズ", phaseId: "p4", start_sec: 805, end_sec: P4_END },
+];
+
+const mechanismsP5 = [
+  { name: "開幕", phaseId: "p5", start_sec: P5_START, end_sec: 927 },
+  { name: "カオティックフラッド", phaseId: "p5", start_sec: 928, end_sec: 939 },
+  { name: "狂気のオーケストラ", phaseId: "p5", start_sec: 940, end_sec: 961 },
+  { name: "スリースターズ", phaseId: "p5", start_sec: 962, end_sec: 992 },
+  { name: "混沌の終末", phaseId: "p5", start_sec: 993, end_sec: 1032 },
+  { name: "狂気のオーケストラ", phaseId: "p5", start_sec: 1033, end_sec: 1061 },
+  { name: "ミッシング・ゼロ", phaseId: "p5", start_sec: 1062, end_sec: P5_END },
 ];
 
 const file = `import type { MechanismSlice, Timeline, Moment } from "../../types";
@@ -204,10 +234,38 @@ export const MECHANISMS_P3: MechanismSlice[] = [
 ${fmtMechanisms(mechanismsP3)}
 ];
 
-const MOMENTS: Moment[] = [...MOMENTS_P1, ...MOMENTS_P2, ...MOMENTS_P3];
+export const MOMENTS_P4: Moment[] = [
+${momentsP4.map(fmtMoment).join("\n")}
+];
+
+export const MECHANISMS_P4: MechanismSlice[] = [
+${fmtMechanisms(mechanismsP4)}
+];
+
+export const MOMENTS_P5: Moment[] = [
+${momentsP5.map(fmtMoment).join("\n")}
+];
+
+export const MECHANISMS_P5: MechanismSlice[] = [
+${fmtMechanisms(mechanismsP5)}
+];
+
+const MOMENTS: Moment[] = [
+  ...MOMENTS_P1,
+  ...MOMENTS_P2,
+  ...MOMENTS_P3,
+  ...MOMENTS_P4,
+  ...MOMENTS_P5,
+];
 MOMENTS.sort((a, b) => a.t_sec - b.t_sec || (a.order ?? 1e9) - (b.order ?? 1e9));
 
-const MECHANISMS: MechanismSlice[] = [...MECHANISMS_P1, ...MECHANISMS_P2, ...MECHANISMS_P3];
+const MECHANISMS: MechanismSlice[] = [
+  ...MECHANISMS_P1,
+  ...MECHANISMS_P2,
+  ...MECHANISMS_P3,
+  ...MECHANISMS_P4,
+  ...MECHANISMS_P5,
+];
 
 export const DANCING_MAD: Timeline = {
   id: "dancing-mad",
@@ -217,6 +275,8 @@ export const DANCING_MAD: Timeline = {
     { id: "p1", title: "P1", start_sec: -15, end_sec: ${P1_END} },
     { id: "p2", title: "P2", start_sec: ${P2_START}, end_sec: ${P2_END} },
     { id: "p3", title: "P3", start_sec: ${P3_START}, end_sec: ${P3_END} },
+    { id: "p4", title: "P4", start_sec: ${P4_START}, end_sec: ${P4_END} },
+    { id: "p5", title: "P5", start_sec: ${P5_START}, end_sec: ${P5_END} },
   ],
   moments: MOMENTS,
   mechanisms: MECHANISMS,
@@ -225,7 +285,11 @@ export const DANCING_MAD: Timeline = {
 
 writeFileSync(path.join(root, "src/data/timelines/dancing-mad.ts"), file, "utf8");
 console.log(
-  `P1: ${momentsP1.length} (${momentsP1[0]?.t_sec}-${momentsP1.at(-1)?.t_sec}), ` +
-    `P2: ${momentsP2.length} (${momentsP2[0]?.t_sec}-${momentsP2.at(-1)?.t_sec}), ` +
-    `P3: ${momentsP3.length} (${momentsP3[0]?.t_sec}-${momentsP3.at(-1)?.t_sec})`
+  [
+    `P1: ${momentsP1.length}`,
+    `P2: ${momentsP2.length}`,
+    `P3: ${momentsP3.length}`,
+    `P4: ${momentsP4.length}`,
+    `P5: ${momentsP5.length}`,
+  ].join(", ")
 );
