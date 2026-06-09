@@ -53,6 +53,26 @@ export function saveTimelineTimeDisplayMode(mode: TimelineTimeDisplayMode) {
   window.localStorage.setItem(TIME_DISPLAY_MODE_STORAGE_KEY, mode);
 }
 
+const PRACTICE_AUTO_SCROLL_STORAGE_KEY = "mp-practice-auto-scroll";
+
+export function loadPracticeAutoScroll(): boolean {
+  if (typeof window === "undefined") {
+    return true;
+  }
+  const stored = window.localStorage.getItem(PRACTICE_AUTO_SCROLL_STORAGE_KEY);
+  return stored !== "off";
+}
+
+export function savePracticeAutoScroll(enabled: boolean) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(
+    PRACTICE_AUTO_SCROLL_STORAGE_KEY,
+    enabled ? "on" : "off"
+  );
+}
+
 export function secondsInPhase(
   tl: Timeline,
   phaseId?: string,

@@ -164,6 +164,13 @@
   border-top: 2px solid #1f2937;
 }
 
+.mp-row-virtual-spacer td {
+  border: none !important;
+  padding: 0 !important;
+  background: transparent !important;
+  pointer-events: none;
+}
+
 /* ========= 1. Header sticky ========= */
 
 thead.mp-header-sticky {

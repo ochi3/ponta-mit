@@ -61,6 +61,13 @@ body.theme-light .mp-row td {
   border-top: 2px solid #cbd5e1;
 }
 
+body.theme-light .mp-row-virtual-spacer td {
+  border: none !important;
+  padding: 0 !important;
+  background: transparent !important;
+  pointer-events: none;
+}
+
 /* ========= 1. Header sticky ========= */
 
 body.theme-light thead.mp-header-sticky {

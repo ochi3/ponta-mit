@@ -41,6 +41,8 @@ type Props = {
   seekTimelineRequest?: { sec: number; requestKey: number } | null;
   onClose: () => void;
   onViewModeChange: (mode: PracticeViewMode) => void;
+  autoScrollEnabled: boolean;
+  onAutoScrollChange: (enabled: boolean) => void;
   onTimelineTimeChange: (timelineSec: number | null) => void;
   onVideoTimeChange: (videoSec: number | null) => void;
   onVideoSourceChange: (source: PracticeVideoSource) => void;
@@ -66,6 +68,8 @@ export default function PracticeModePanel({
   seekTimelineRequest,
   onClose,
   onViewModeChange,
+  autoScrollEnabled,
+  onAutoScrollChange,
   onTimelineTimeChange,
   onVideoTimeChange,
   onVideoSourceChange,
@@ -360,6 +364,29 @@ export default function PracticeModePanel({
             >
               アイコン
             </button>
+            {viewMode === "timeline" && (
+              <>
+                <span
+                  className={`mx-0.5 hidden h-5 w-px sm:inline-block ${
+                    isLight ? "bg-slate-300" : "bg-slate-600"
+                  }`}
+                  aria-hidden="true"
+                />
+                <button
+                  type="button"
+                  onClick={() => onAutoScrollChange(!autoScrollEnabled)}
+                  className={autoScrollEnabled ? activeViewButtonClass : inactiveViewButtonClass}
+                  title={
+                    autoScrollEnabled
+                      ? "再生位置に合わせてタイムラインを自動スクロールします"
+                      : "自動スクロールをオフにしています"
+                  }
+                  aria-pressed={autoScrollEnabled}
+                >
+                  自動スクロール
+                </button>
+              </>
+            )}
             {primaryJobId && (hasBaseVideo || hasJobVideo) && (
               <>
                 <span

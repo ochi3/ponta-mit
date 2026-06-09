@@ -153,13 +153,13 @@ const phaseSections = splitPhaseSections(raw);
 
 const P1_END = 202;
 const P2_START = 197;
-const P2_END = 387;
-const P3_START = 382;
-const P3_END = 734;
-const P4_START = 734;
-const P4_END = 868;
-const P5_START = 862;
-const P5_END = 1122;
+const P2_END = 385;
+const P3_START = 380;
+const P3_END = 732;
+const P4_START = 732;
+const P4_END = 866;
+const P5_START = 860;
+const P5_END = 1120;
 
 const momentsP1 = [
   { t_sec: -15, name: "戦闘前", elem: "none", kind: "event" },
@@ -178,34 +178,34 @@ const mechanismsP1 = [
 ];
 
 const mechanismsP2 = [
-  { name: "開幕", phaseId: "p2", start_sec: P2_START, end_sec: 235 },
-  { name: "ミッシング", phaseId: "p2", start_sec: 236, end_sec: 353 },
-  { name: "トライン", phaseId: "p2", start_sec: 354, end_sec: P2_END },
+  { name: "開幕", phaseId: "p2", start_sec: P2_START, end_sec: 233 },
+  { name: "ミッシング", phaseId: "p2", start_sec: 234, end_sec: 351 },
+  { name: "トライン", phaseId: "p2", start_sec: 352, end_sec: P2_END },
 ];
 
 const mechanismsP3 = [
-  { name: "開幕", phaseId: "p3", start_sec: P3_START, end_sec: 430 },
-  { name: "決戦 1 回目", phaseId: "p3", start_sec: 431, end_sec: 506 },
-  { name: "アルテマブラスター", phaseId: "p3", start_sec: 507, end_sec: 544 },
-  { name: "じしん & ブラックホール", phaseId: "p3", start_sec: 545, end_sec: 699 },
-  { name: "どんどこ地団駄", phaseId: "p3", start_sec: 700, end_sec: 717 },
-  { name: "時間切れまで", phaseId: "p3", start_sec: 718, end_sec: P3_END },
+  { name: "開幕", phaseId: "p3", start_sec: P3_START, end_sec: 428 },
+  { name: "決戦 1 回目", phaseId: "p3", start_sec: 429, end_sec: 504 },
+  { name: "アルテマブラスター", phaseId: "p3", start_sec: 505, end_sec: 542 },
+  { name: "じしん & ブラックホール", phaseId: "p3", start_sec: 543, end_sec: 697 },
+  { name: "どんどこ地団駄", phaseId: "p3", start_sec: 698, end_sec: 715 },
+  { name: "時間切れまで", phaseId: "p3", start_sec: 716, end_sec: P3_END },
 ];
 
 const mechanismsP4 = [
-  { name: "開幕", phaseId: "p4", start_sec: P4_START, end_sec: 758 },
-  { name: "真偽記憶フェーズ", phaseId: "p4", start_sec: 759, end_sec: 804 },
-  { name: "デバフ解放フェーズ", phaseId: "p4", start_sec: 805, end_sec: P4_END },
+  { name: "開幕", phaseId: "p4", start_sec: P4_START, end_sec: 756 },
+  { name: "真偽記憶フェーズ", phaseId: "p4", start_sec: 757, end_sec: 802 },
+  { name: "デバフ解放フェーズ", phaseId: "p4", start_sec: 803, end_sec: P4_END },
 ];
 
 const mechanismsP5 = [
-  { name: "開幕", phaseId: "p5", start_sec: P5_START, end_sec: 927 },
-  { name: "カオティックフラッド", phaseId: "p5", start_sec: 928, end_sec: 939 },
-  { name: "狂気のオーケストラ", phaseId: "p5", start_sec: 940, end_sec: 961 },
-  { name: "スリースターズ", phaseId: "p5", start_sec: 962, end_sec: 992 },
-  { name: "混沌の終末", phaseId: "p5", start_sec: 993, end_sec: 1032 },
-  { name: "狂気のオーケストラ", phaseId: "p5", start_sec: 1033, end_sec: 1061 },
-  { name: "ミッシング・ゼロ", phaseId: "p5", start_sec: 1062, end_sec: P5_END },
+  { name: "開幕", phaseId: "p5", start_sec: P5_START, end_sec: 925 },
+  { name: "カオティックフラッド", phaseId: "p5", start_sec: 926, end_sec: 937 },
+  { name: "狂気のオーケストラ", phaseId: "p5", start_sec: 938, end_sec: 959 },
+  { name: "スリースターズ", phaseId: "p5", start_sec: 960, end_sec: 990 },
+  { name: "混沌の終末", phaseId: "p5", start_sec: 991, end_sec: 1030 },
+  { name: "狂気のオーケストラ", phaseId: "p5", start_sec: 1031, end_sec: 1059 },
+  { name: "ミッシング・ゼロ", phaseId: "p5", start_sec: 1060, end_sec: P5_END },
 ];
 
 const file = `import type { MechanismSlice, Timeline, Moment } from "../../types";

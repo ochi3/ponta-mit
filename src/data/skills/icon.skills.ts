@@ -65,6 +65,7 @@ import HEALER_AST_EARTHLY_STAR from "@/assets/icons/skills/healer.ast/earthly_st
 import HEALER_AST_MACROCOSMOS from "@/assets/icons/skills/healer.ast/macrocosmos.png";
 import HEALER_AST_CELESTIAL_OPPOSITION from "@/assets/icons/skills/healer.ast/celestial_opposition.png";
 import HEALER_AST_LIGHTSPEED from "@/assets/icons/skills/healer.ast/lightspeed.png";
+import HEALER_AST_HELIOS from "@/assets/icons/skills/healer.ast/helios.png";
 import HEALER_AST_ASPECTED_HELIOS from "@/assets/icons/skills/healer.ast/aspected_helios.png";
 import HEALER_AST_HOROSCOPE from "@/assets/icons/skills/healer.ast/horoscope.png";
 import HEALER_AST_CELESTIAL_INTERSECTION from "@/assets/icons/skills/healer.ast/celestial_intersection.png";
@@ -163,6 +164,7 @@ export const SKILL_ICON: Record<string, string> = {
   "healer.ast.macrocosmos": HEALER_AST_MACROCOSMOS,
   "healer.ast.celestial_opposition": HEALER_AST_CELESTIAL_OPPOSITION,
   "healer.ast.lightspeed": HEALER_AST_LIGHTSPEED,
+  "healer.ast.helios": HEALER_AST_HELIOS,
   "healer.ast.aspected_helios": HEALER_AST_ASPECTED_HELIOS,
   "healer.ast.horoscope": HEALER_AST_HOROSCOPE,
   "healer.ast.celestial_intersection": HEALER_AST_CELESTIAL_INTERSECTION,

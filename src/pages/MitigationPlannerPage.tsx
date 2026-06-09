@@ -31,7 +31,11 @@ import {
   resolvePracticeSyncTarget,
 } from "../logic/practiceVideo";
 import type { PracticeSyncTarget } from "../logic/practiceVideo";
-import { secondsInPhase } from "../logic/timelineView";
+import {
+  loadPracticeAutoScroll,
+  savePracticeAutoScroll,
+  secondsInPhase,
+} from "../logic/timelineView";
 import type { ValidationIssue } from "../logic/validation";
 import { useStore } from "../state/store";
 import {
@@ -123,6 +127,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   const [practiceVideoSec, setPracticeVideoSec] = useState<number | null>(null);
   const [practiceVideoPaneWidth, setPracticeVideoPaneWidth] = useState<number | null>(null);
   const [practiceViewMode, setPracticeViewMode] = useState<PracticeViewMode>("timeline");
+  const [practiceAutoScroll, setPracticeAutoScroll] = useState(loadPracticeAutoScroll);
   const [practiceSeekRequest, setPracticeSeekRequest] = useState<{
     sec: number;
     requestKey: number;
@@ -651,6 +656,11 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     setPracticeViewMode(mode);
   }, []);
 
+  const handlePracticeAutoScrollChange = useCallback((enabled: boolean) => {
+    setPracticeAutoScroll(enabled);
+    savePracticeAutoScroll(enabled);
+  }, []);
+
   function handleSyncTargetChange(target: PracticeSyncTarget) {
     setSyncTarget(target);
   }
@@ -768,6 +778,8 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
                   seekTimelineRequest={practiceSeekRequest}
                   onClose={closePracticeMode}
                   onViewModeChange={handlePracticeViewModeChange}
+                  autoScrollEnabled={practiceAutoScroll}
+                  onAutoScrollChange={handlePracticeAutoScrollChange}
                   onTimelineTimeChange={handlePracticeTimelineTimeChange}
                   onVideoTimeChange={handlePracticeVideoTimeChange}
                   onVideoSourceChange={handlePracticeVideoSourceChange}
@@ -803,7 +815,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
                     focusRequestKey={validationFocus?.requestKey}
                     scrollToSecond={phaseScrollToSecond}
                     scrollRequestKey={phaseScrollRequestKey}
-                    followTime
+                    followTime={practiceAutoScroll}
                     onTimeClick={handleTimeClick}
                     onEventClick={handlePracticeEventClick}
                     syncSeconds={syncSeconds}

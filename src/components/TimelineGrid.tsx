@@ -25,6 +25,16 @@ import {
   saveTimelineTimeDisplayMode,
   type TimelineTimeDisplayMode,
 } from "../logic/timelineView";
+import {
+  TIMELINE_ROW_HEIGHT_PX,
+  TIMELINE_VIRTUAL_MIN_ROWS,
+  buildMechanismRunRanges,
+  computeTimelineVirtualRange,
+  findDisplayIndexForTimelineSec,
+  isDisplayIndexInComfortZone,
+  resolveVirtualMechanismCell,
+  scrollWrapperToDisplayIndex,
+} from "../logic/timelineVirtualScroll";
 import { resolveMomentNote } from "../logic/momentNotes";
 import {
   clampMemoColumnWidth,
@@ -455,6 +465,8 @@ export default function TimelineGrid({
   const { t } = useI18n();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const damagePopoverRef = useRef<HTMLDivElement | null>(null);
+  const handledPhaseScrollKeyRef = useRef<number | undefined>(undefined);
+  const handledValidationFocusKeyRef = useRef<number | undefined>(undefined);
   const team = useStore((s) => s.team);
   const setTeam = useStore((s) => s.setTeam);
   const usages = useStore((s) => s.usages);
@@ -831,6 +843,72 @@ export default function TimelineGrid({
     [displaySecondLines, hasMechanisms, mechanismNames]
   );
 
+  const mechanismRunRanges = useMemo(
+    () => buildMechanismRunRanges(displayMechanismRuns),
+    [displayMechanismRuns]
+  );
+
+  const [virtualScrollTop, setVirtualScrollTop] = useState(0);
+  const [wrapperViewportHeight, setWrapperViewportHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) {
+      return;
+    }
+
+    const syncViewport = () => {
+      setVirtualScrollTop(wrapper.scrollTop);
+      setWrapperViewportHeight(wrapper.clientHeight);
+    };
+
+    syncViewport();
+    wrapper.addEventListener("scroll", syncViewport, { passive: true });
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(syncViewport)
+        : null;
+    resizeObserver?.observe(wrapper);
+
+    return () => {
+      wrapper.removeEventListener("scroll", syncViewport);
+      resizeObserver?.disconnect();
+    };
+  }, [displayRows.length, cols.length, hasMechanisms]);
+
+  const virtualRange = useMemo(
+    () =>
+      computeTimelineVirtualRange(
+        displayRows.length,
+        virtualScrollTop,
+        wrapperViewportHeight,
+        TIMELINE_ROW_HEIGHT_PX
+      ),
+    [displayRows.length, virtualScrollTop, wrapperViewportHeight]
+  );
+
+  const visibleDisplayRows = useMemo(() => {
+    if (!virtualRange.enabled) {
+      return displayRows.map((row, displayIndex) => ({ row, displayIndex }));
+    }
+
+    const items: Array<{
+      row: (typeof displayRows)[number];
+      displayIndex: number;
+    }> = [];
+    for (let displayIndex = virtualRange.start; displayIndex <= virtualRange.end; displayIndex++) {
+      const row = displayRows[displayIndex];
+      if (row) {
+        items.push({ row, displayIndex });
+      }
+    }
+    return items;
+  }, [displayRows, virtualRange]);
+
+  const totalColumnCount =
+    (hasMechanisms ? 1 : 0) + 5 + cols.length;
+
   const rowIndexLookup = useMemo(() => {
     const map = new Map<string, number>();
     for (let r = 0; r < rows.length; r++) {
@@ -980,6 +1058,28 @@ export default function TimelineGrid({
       return;
     }
 
+    const virtualEnabled =
+      displayRows.length >= TIMELINE_VIRTUAL_MIN_ROWS && wrapper.clientHeight > 0;
+
+    if (virtualEnabled) {
+      const displayIndex = findDisplayIndexForTimelineSec(displayRows, focusSecond);
+      if (displayIndex < 0) {
+        return;
+      }
+
+      if (
+        !isDisplayIndexInComfortZone(
+          displayIndex,
+          wrapper.scrollTop,
+          wrapper.clientHeight,
+          TIMELINE_ROW_HEIGHT_PX
+        )
+      ) {
+        scrollWrapperToDisplayIndex(wrapper, displayIndex, TIMELINE_ROW_HEIGHT_PX);
+      }
+      return;
+    }
+
     const targetRow = wrapper.querySelector<HTMLTableRowElement>(
       `tr[data-row-sec="${focusSecond}"]`
     );
@@ -995,13 +1095,16 @@ export default function TimelineGrid({
     if (rowRect.top < topThreshold || rowRect.bottom > bottomThreshold) {
       targetRow.scrollIntoView({ block: "center" });
     }
-  }, [followTime, focusSecond]);
+  }, [displayRows, followTime, focusSecond]);
 
   useEffect(() => {
     if (scrollRequestKey === undefined) {
       return;
     }
     if (scrollToSecond === null || scrollToSecond === undefined) {
+      return;
+    }
+    if (handledPhaseScrollKeyRef.current === scrollRequestKey) {
       return;
     }
 
@@ -1016,12 +1119,29 @@ export default function TimelineGrid({
         return;
       }
 
+      const virtualEnabled =
+        displayRows.length >= TIMELINE_VIRTUAL_MIN_ROWS && wrapper.clientHeight > 0;
+
+      if (virtualEnabled) {
+        const displayIndex = findDisplayIndexForTimelineSec(
+          displayRows,
+          scrollToSecond
+        );
+        if (displayIndex < 0) {
+          return;
+        }
+        scrollWrapperToDisplayIndex(wrapper, displayIndex, TIMELINE_ROW_HEIGHT_PX);
+        handledPhaseScrollKeyRef.current = scrollRequestKey;
+        return;
+      }
+
       const targetRow = resolvePhaseScrollRow(wrapper, scrollToSecond);
       if (!targetRow) {
         return;
       }
 
       scrollWrapperToTimelineRow(wrapper, targetRow);
+      handledPhaseScrollKeyRef.current = scrollRequestKey;
     };
 
     requestAnimationFrame(() => {
@@ -1031,7 +1151,7 @@ export default function TimelineGrid({
     return () => {
       cancelled = true;
     };
-  }, [scrollRequestKey, scrollToSecond]);
+  }, [displayRows, scrollRequestKey, scrollToSecond, wrapperViewportHeight]);
 
   useEffect(() => {
     if (
@@ -1049,24 +1169,47 @@ export default function TimelineGrid({
       return;
     }
 
-    const rowKey = `${focusSecond}::${focusLineIndex}`;
-    const targetRow = wrapper.querySelector<HTMLTableRowElement>(
-      `tr[data-row-key="${rowKey}"]`
-    );
-    const targetCell =
-      focusSkillId
-        ? wrapper.querySelector<HTMLTableCellElement>(
-            `td[data-cell-key$="::${focusSecond}::${focusLineIndex}"][data-skill-id="${focusSkillId}"]`
-          )
-        : null;
+    if (handledValidationFocusKeyRef.current === focusRequestKey) {
+      return;
+    }
 
-    if (targetRow) {
-      targetRow.scrollIntoView({ block: "center" });
+    const rowKey = `${focusSecond}::${focusLineIndex}`;
+    const displayIndex = displayRows.findIndex(
+      (row) => row.sec === focusSecond && row.lineIndex === focusLineIndex
+    );
+    const virtualEnabled =
+      displayRows.length >= TIMELINE_VIRTUAL_MIN_ROWS && wrapper.clientHeight > 0;
+
+    const scrollToDomTargets = () => {
+      const targetRow = wrapper.querySelector<HTMLTableRowElement>(
+        `tr[data-row-key="${rowKey}"]`
+      );
+      const targetCell =
+        focusSkillId
+          ? wrapper.querySelector<HTMLTableCellElement>(
+              `td[data-cell-key$="::${focusSecond}::${focusLineIndex}"][data-skill-id="${focusSkillId}"]`
+            )
+          : null;
+
+      if (targetRow) {
+        targetRow.scrollIntoView({ block: "center" });
+      }
+      if (targetCell) {
+        targetCell.scrollIntoView({ inline: "center", block: "nearest" });
+      }
+      handledValidationFocusKeyRef.current = focusRequestKey;
+    };
+
+    if (virtualEnabled && displayIndex >= 0) {
+      scrollWrapperToDisplayIndex(wrapper, displayIndex, TIMELINE_ROW_HEIGHT_PX);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(scrollToDomTargets);
+      });
+      return;
     }
-    if (targetCell) {
-      targetCell.scrollIntoView({ inline: "center", block: "nearest" });
-    }
-  }, [focusLineIndex, focusRequestKey, focusSecond, focusSkillId]);
+
+    scrollToDomTargets();
+  }, [displayRows, focusLineIndex, focusRequestKey, focusSecond, focusSkillId]);
 
   useEffect(() => {
     if (!focusJobId) {
@@ -2617,12 +2760,37 @@ export default function TimelineGrid({
             </thead>
 
             <tbody>
-              {displayRows.map((row, displayIndex) => {
+              {virtualRange.enabled && virtualRange.paddingTop > 0 && (
+                <tr className="mp-row-virtual-spacer" aria-hidden="true">
+                  <td
+                    colSpan={totalColumnCount}
+                    style={{
+                      height: virtualRange.paddingTop,
+                      padding: 0,
+                      border: "none",
+                      lineHeight: 0,
+                    }}
+                  />
+                </tr>
+              )}
+              {visibleDisplayRows.map(({ row, displayIndex }) => {
                 const mechanismCell = hasMechanisms
-                  ? displayMechanismRuns.get(displayIndex)
-                  : undefined;
+                  ? virtualRange.enabled
+                    ? resolveVirtualMechanismCell(
+                        displayIndex,
+                        virtualRange.start,
+                        virtualRange.end,
+                        displayMechanismRuns,
+                        mechanismRunRanges
+                      )
+                    : (() => {
+                        const cell = displayMechanismRuns.get(displayIndex);
+                        return cell
+                          ? { label: cell.label, rowSpan: cell.span }
+                          : null;
+                      })()
+                  : null;
                 const summaryRowIndex = row.rowIndex;
-                const mechanismLabel = mechanismCell?.label ?? "";
                 const moment = row.line.moment;
                 const rowKey = `${row.sec}::${row.lineIndex}`;
                 const hasValidationIssue = validationRows.has(rowKey);
@@ -2639,11 +2807,11 @@ export default function TimelineGrid({
                     {hasMechanisms && mechanismCell && (
                       <td
                         className="p-0 mp-col-mechanism mp-col-freeze mp-col-freeze--first"
-                        rowSpan={mechanismCell.span}
+                        rowSpan={mechanismCell.rowSpan}
                         style={freezeStyle(freezeOffsets.mechanism)}>
                         <div className="mp-mechanism-anchor">
-                          <div className="mp-mechanism-cell" title={mechanismLabel}>
-                            {mechanismLabel}
+                          <div className="mp-mechanism-cell" title={mechanismCell.label}>
+                            {mechanismCell.label}
                           </div>
                         </div>
                       </td>
@@ -2886,6 +3054,19 @@ export default function TimelineGrid({
                   </tr>
                 );
               })}
+              {virtualRange.enabled && virtualRange.paddingBottom > 0 && (
+                <tr className="mp-row-virtual-spacer" aria-hidden="true">
+                  <td
+                    colSpan={totalColumnCount}
+                    style={{
+                      height: virtualRange.paddingBottom,
+                      padding: 0,
+                      border: "none",
+                      lineHeight: 0,
+                    }}
+                  />
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
