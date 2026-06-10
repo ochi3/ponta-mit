@@ -3,8 +3,6 @@ import type { JobId, PlanUsage, SkillId } from "../types";
 
 export const SCH_AETHERFLOW_ID = "healer.sch.aetherflow";
 export const SCH_DISSIPATION_ID = "healer.sch.dissipation";
-export const SCH_ENERGY_DRAIN_ID = "healer.sch.energy_drain";
-export const SCH_LUSTRATE_ID = "healer.sch.lustrate";
 export const SCH_SACRED_SOIL_ID = "healer.sch.sacred_soil";
 export const SCH_INDOMITABILITY_ID = "healer.sch.indomitability";
 export const SCH_EXCOGITATION_ID = "healer.sch.excogitation";
@@ -14,8 +12,6 @@ export const SCH_AETHERFLOW_CYCLE_SECONDS = 60;
 export const SCH_AETHERFLOW_CAPACITY = 3;
 
 const SCH_AETHERFLOW_SPENDER_SKILL_IDS = new Set<SkillId>([
-  SCH_ENERGY_DRAIN_ID,
-  SCH_LUSTRATE_ID,
   SCH_SACRED_SOIL_ID,
   SCH_INDOMITABILITY_ID,
   SCH_EXCOGITATION_ID,

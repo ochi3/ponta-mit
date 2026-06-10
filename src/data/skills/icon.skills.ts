@@ -90,10 +90,8 @@ import HEALER_SCH_SUMMON_SERAPH from "@/assets/icons/skills/healer.sch/summon_se
 import HEALER_SCH_CONSOLATION from "@/assets/icons/skills/healer.sch/consolation.png";
 import HEALER_SCH_AETHERFLOW from "@/assets/icons/skills/healer.sch/aetherflow.png";
 import HEALER_SCH_DISSIPATION from "@/assets/icons/skills/healer.sch/dissipation.png";
-import HEALER_SCH_ENERGY_DRAIN from "@/assets/icons/skills/healer.sch/energy_drain.png";
 import HEALER_SCH_EXCOGITATION from "@/assets/icons/skills/healer.sch/excogitation.png";
 import HEALER_SCH_INDOMITABILITY from "@/assets/icons/skills/healer.sch/indomitability.png";
-import HEALER_SCH_LUSTRATE from "@/assets/icons/skills/healer.sch/lustrate.png";
 import HEALER_SCH_PROTRACTION from "@/assets/icons/skills/healer.sch/protraction.png";
 import HEALER_SCH_RECITATION from "@/assets/icons/skills/healer.sch/recitation.png";
 import HEALER_SCH_DEPLOYMENT from "@/assets/icons/skills/healer.sch/deployment.png";
@@ -191,10 +189,8 @@ export const SKILL_ICON: Record<string, string> = {
   "healer.sch.summon_seraph": HEALER_SCH_SUMMON_SERAPH,
   "healer.sch.consolation": HEALER_SCH_CONSOLATION,
   "healer.sch.dissipation": HEALER_SCH_DISSIPATION,
-  "healer.sch.energy_drain": HEALER_SCH_ENERGY_DRAIN,
   "healer.sch.excogitation": HEALER_SCH_EXCOGITATION,
   "healer.sch.indomitability": HEALER_SCH_INDOMITABILITY,
-  "healer.sch.lustrate": HEALER_SCH_LUSTRATE,
   "healer.sch.protraction": HEALER_SCH_PROTRACTION,
   "healer.sch.recitation": HEALER_SCH_RECITATION,
   "healer.sch.deployment": HEALER_SCH_DEPLOYMENT,

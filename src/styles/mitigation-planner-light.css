@@ -111,6 +111,19 @@ body.theme-light td.mp-col-freeze--last {
   z-index: 40;
 }
 
+/* 横スクロール時、ジョブヘッダーが固定列の上に被らないようにする */
+body.theme-light thead.mp-header-sticky th.mp-col-freeze--first {
+  z-index: 75;
+}
+
+body.theme-light thead.mp-header-sticky th.mp-col-freeze--middle {
+  z-index: 74;
+}
+
+body.theme-light thead.mp-header-sticky th.mp-col-freeze--last {
+  z-index: 73;
+}
+
 /* Cover up skill-bar overflow */
 body.theme-light td.mp-col-freeze::before {
   content: "";
