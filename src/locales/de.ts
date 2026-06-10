@@ -36,6 +36,13 @@ const de = {
       duty: "Inhalt",
     },
   },
+  nav: {
+    ariaLabel: "Seitennavigation",
+    siteName: "PONTA",
+    planner: "Mitigationsplan",
+    activity: "Aktivitätsprotokoll",
+    activitySummary: "{days} Tg. · {duration}",
+  },
   timeline: {
     headers: {
       mechanism: "Mech",

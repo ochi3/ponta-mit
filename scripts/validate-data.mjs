@@ -25,6 +25,7 @@ const skillScopes = new Set([
   "range_target",
 ]);
 const skillKinds = new Set(["mitigation", "shield", "invuln", "heal", "utility"]);
+const activityDateRe = /^\d{4}-\d{2}-\d{2}$/;
 
 function rel(filePath) {
   return path.relative(rootDir, filePath).replaceAll(path.sep, "/");
@@ -382,8 +383,77 @@ function validateCustomSkillPack(filePath, pack, skillIdSet, seenSkillIds) {
   }
 }
 
+function validateActivityRecordJson(filePath, book, seenIds) {
+  if (!isObject(book)) {
+    addError(filePath, "activity record root must be an object");
+    return;
+  }
+  if (typeof book.id !== "string" || !book.id.trim()) {
+    addError(filePath, "id must be a non-empty string");
+  } else if (seenIds.has(book.id)) {
+    addError(filePath, `duplicate activity record id "${book.id}"`);
+  } else {
+    seenIds.add(book.id);
+  }
+  if (typeof book.title !== "string" || !book.title.trim()) {
+    addError(filePath, "title must be a non-empty string");
+  }
+  if (book.version !== 1) {
+    addError(filePath, "version must be 1");
+  }
+  if (book.description !== undefined && typeof book.description !== "string") {
+    addError(filePath, "description must be a string");
+  }
+  if (!Array.isArray(book.entries)) {
+    addError(filePath, "entries must be an array");
+    return;
+  }
+
+  const seenDates = new Set();
+  for (const [index, entry] of book.entries.entries()) {
+    const label = `entries[${index}]`;
+    if (!isObject(entry)) {
+      addError(filePath, `${label} must be an object`);
+      continue;
+    }
+    if (typeof entry.date !== "string" || !activityDateRe.test(entry.date)) {
+      addError(filePath, `${label}.date must be YYYY-MM-DD`);
+    } else if (seenDates.has(entry.date)) {
+      addError(filePath, `${label}.date duplicates "${entry.date}"`);
+    } else {
+      seenDates.add(entry.date);
+    }
+    if (!Number.isFinite(entry.duration_min) || entry.duration_min < 0) {
+      addError(filePath, `${label}.duration_min must be 0 or greater`);
+    }
+    if (typeof entry.progress !== "string") {
+      addError(filePath, `${label}.progress must be a string`);
+    }
+    if (entry.fflogs_url !== undefined && typeof entry.fflogs_url !== "string") {
+      addError(filePath, `${label}.fflogs_url must be a string`);
+    }
+  }
+}
+
+function validateActivityRecords() {
+  const customDir = path.join(rootDir, "src", "data", "activity-records", "custom");
+  const jsonFiles = listFiles(customDir, (filePath) => filePath.endsWith(".json"));
+  const seenIds = new Set();
+
+  for (const filePath of jsonFiles) {
+    try {
+      validateActivityRecordJson(filePath, JSON.parse(readFileSync(filePath, "utf8")), seenIds);
+    } catch (error) {
+      addError(filePath, `invalid JSON (${error instanceof Error ? error.message : String(error)})`);
+    }
+  }
+
+  return jsonFiles.length;
+}
+
 const timelineCount = validateCustomTimelines();
 const skillCount = validateSkills();
+const activityRecordCount = validateActivityRecords();
 
 if (errors.length > 0) {
   console.error(`Data validation failed with ${errors.length} issue(s):`);
@@ -392,5 +462,7 @@ if (errors.length > 0) {
   }
   process.exitCode = 1;
 } else {
-  console.log(`Data validation passed (${skillCount} skills, ${timelineCount} custom timelines).`);
+  console.log(
+    `Data validation passed (${skillCount} skills, ${timelineCount} custom timelines, ${activityRecordCount} activity records).`
+  );
 }

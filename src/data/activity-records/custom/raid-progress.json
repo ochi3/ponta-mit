@@ -1,0 +1,14 @@
+{
+  "id": "raid-progress",
+  "title": "絶妖星乱舞 DMU",
+  "version": 1,
+  "description": "絶妖星乱舞 活動ログ",
+  "entries": [
+    {
+      "date": "2026-06-10",
+      "duration_min": 180,
+      "progress": "P2 ミッシングの全体で壊滅",
+      "fflogs_url": "https://ja.fflogs.com/reports/LmdcPCTh37wGXW2j"
+    }
+  ]
+}

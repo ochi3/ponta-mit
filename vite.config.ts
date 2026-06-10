@@ -42,9 +42,8 @@ async function loadDevOnlyPlugins(mode: string): Promise<Plugin[]> {
 
   if (existsSync(maintenancePluginPath)) {
     try {
-      const module = (await import(
-        pathToFileURL(maintenancePluginPath).href
-      )) as MaintenanceModule
+      // Node の raw import では src/ の TS が解決できないため、Vite 経由の相対 import を使う
+      const module = (await import('./devtools/maintenancePlugin.ts')) as MaintenanceModule
       plugins.push(module.maintenanceDevToolsPlugin())
     } catch (error) {
       console.warn(

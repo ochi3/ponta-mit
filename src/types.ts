@@ -189,3 +189,29 @@ export interface SharePayload {
   /** Table layout preferences such as memo column width. */
   layoutPrefs?: PlannerLayoutPrefs;
 }
+
+/** 1日分の活動記録 */
+export interface ActivityRecordEntry {
+  /** YYYY-MM-DD */
+  date: string;
+  /** 活動時間（分） */
+  duration_min: number;
+  /** 進捗メモ */
+  progress: string;
+  /** FFLogs などのログ URL */
+  fflogs_url?: string;
+}
+
+/** 活動記録ブック（コンテンツ単位） */
+export interface ActivityRecordBook {
+  id: string;
+  title: string;
+  version: 1;
+  description?: string;
+  entries: ActivityRecordEntry[];
+}
+
+export interface ActivityRecordSharePayload {
+  v: 1;
+  book: ActivityRecordBook;
+}

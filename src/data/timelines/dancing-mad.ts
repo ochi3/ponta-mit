@@ -79,10 +79,10 @@ export const MOMENTS_P1: Moment[] = [
   { t_sec: 186, name: "なぞなぞマジック", elem: "none", kind: "event" },
   { t_sec: 186, name: "もりもりサンダガ", elem: "none", order: 2, kind: "event" },
   { t_sec: 186, name: "惰眠の神気 or アヴェ・マリア", elem: "none", order: 3, kind: "event" },
+  { t_sec: 186, name: "めらめらファイガ (散開 or 頭割り)", elem: "magic", damage: 220000 },
   { t_sec: 189, name: "AA", elem: "physical", damage: 115000 },
   { t_sec: 192, name: "AA", elem: "physical", damage: 115000 },
   { t_sec: 195, name: "AA", elem: "physical", damage: 115000 },
-  { t_sec: 197, name: "めらめらファイガ (散開 or 頭割り)", elem: "magic", damage: 220000 },
   { t_sec: 197, name: "裁きの光 (詠唱開始)", elem: "none", order: 2, kind: "event" },
   { t_sec: 202, name: "裁きの光", elem: "magic", damage: 9999999 },
 ];

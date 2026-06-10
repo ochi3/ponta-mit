@@ -8,7 +8,13 @@ import {
     loadBuiltinTimeline,
     resolveTimelineId,
 } from "../data/timelines/registry";
+import {
+    DEFAULT_ACTIVITY_RECORD_ID,
+    getBuiltinActivityRecordBook,
+} from "../data/activity-records/registry";
+import { computeActivityRecordStats } from "../logic/activityRecordStats";
 import { encodeShareUrl } from "../logic/share";
+import SiteBrandingNav from "./SiteBrandingNav";
 import { parseTimelineJson } from "../logic/timelineImport";
 import { serializeTimelineJson } from "../logic/timelineExport";
 import { useStore } from "../state/store";
@@ -196,12 +202,12 @@ export default function TopBar({
     }
 
     const timelineTitle = resolveIntlString(tl.title, undefined);
-    const themeName = t(`topbar.theme.name.${theme}`);
-    const themePlaceholder = "__THEME__";
-    const plannerTitleTemplate = t("topbar.theme.title", { theme: themePlaceholder });
-    const [titlePrefix, titleSuffix] = plannerTitleTemplate.includes(themePlaceholder)
-        ? plannerTitleTemplate.split(themePlaceholder)
-        : [plannerTitleTemplate, ""];
+    const activitySummary = useMemo(() => {
+        const book = getBuiltinActivityRecordBook(DEFAULT_ACTIVITY_RECORD_ID);
+        if (!book) return undefined;
+        const stats = computeActivityRecordStats(book.entries);
+        return { dayCount: stats.dayCount, durationLabel: stats.label };
+    }, []);
 
     const actionButtonClass = isLight
         ? "px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 border border-indigo-200/80 text-slate-900 bg-white/70 hover:border-indigo-400 hover:bg-indigo-50"
@@ -243,30 +249,12 @@ export default function TopBar({
     return (
     <div className="flex flex-col gap-4 mt-2 mb-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-baseline gap-3">
-                <div className="flex items-center gap-2">
-                    <h1 className={`text-lg font-semibold ${isLight ? "text-slate-900" : "text-slate-100"}`}>
-                        {titlePrefix}
-                        <button
-                            type="button"
-                            onClick={onToggleTheme}
-                            className={`relative inline-flex font-semibold transition duration-200 focus:outline-none ${
-                                isLight
-                                    ? "text-transparent bg-clip-text bg-linear-to-b from-[#FFE29F] via-[#FFEEA9] to-[#F9D423] hover:drop-shadow-[0_0_12px_rgba(249,212,35,0.9)]"
-                                    : "text-transparent bg-clip-text bg-linear-to-b from-[#312E81] via-[#7C3AED] to-[#A855F7] hover:drop-shadow-[0_0_12px_rgba(124,58,237,0.9)]"
-                            }`}
-                        >
-                            {themeName}
-                        </button>
-                        {titleSuffix}
-                    </h1>
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className={`text-xs ${labelTone}`}>
-                        {t("topbar.subtitle")}
-                    </span>
-                </div>
-            </div>
+            <SiteBrandingNav
+                current="planner"
+                isLight={isLight}
+                onToggleTheme={onToggleTheme}
+                activitySummary={activitySummary}
+            />
 
             <div className="flex flex-wrap items-center gap-2">
 

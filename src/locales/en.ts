@@ -37,6 +37,13 @@ const en = {
     },
     cellClick: "L: toggle　R: place start from inclusive end row",
   },
+  nav: {
+    ariaLabel: "Site navigation",
+    siteName: "PONTA",
+    planner: "Mitigation Sheet",
+    activity: "Activity Log",
+    activitySummary: "{days}d · {duration}",
+  },
   timeline: {
     headers: {
       mechanism: "Mech",

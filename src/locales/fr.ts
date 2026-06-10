@@ -36,6 +36,13 @@ const fr = {
       duty: "Mission",
     },
   },
+  nav: {
+    ariaLabel: "Navigation du site",
+    siteName: "PONTA",
+    planner: "Plan de mitigation",
+    activity: "Journal d'activité",
+    activitySummary: "{days} j · {duration}",
+  },
   timeline: {
     headers: {
       mechanism: "Méca",

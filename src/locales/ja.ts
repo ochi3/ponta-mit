@@ -37,6 +37,13 @@ const ja = {
     },
     cellClick: "左: ON/OFF　右: 終了行から開始へ逆算",
   },
+  nav: {
+    ariaLabel: "サイト内ナビゲーション",
+    siteName: "PONTA",
+    planner: "軽減表",
+    activity: "活動記録",
+    activitySummary: "{days}日 · {duration}",
+  },
   timeline: {
     headers: {
       mechanism: "ギミック",

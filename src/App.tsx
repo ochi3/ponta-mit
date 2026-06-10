@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import MitigationPlannerPage from "./pages/MitigationPlannerPage";
+import ActivityRecordPage from "./pages/ActivityRecordPage";
 import { useStore } from "./state/store";
 import type { Timeline } from "./types";
 import {
@@ -8,8 +9,9 @@ import {
   loadBuiltinTimeline,
   resolveTimelineId,
 } from "./data/timelines/registry";
+import { getCurrentAppView, type AppView } from "./logic/appRoute";
 
-export default function App() {
+function PlannerApp() {
   const timelineId = useStore((s) => s.timelineId);
   const importedTimeline = useStore((s) => s.importedTimeline);
   const [builtinTimeline, setBuiltinTimeline] = useState<Timeline | null>(null);
@@ -82,4 +84,20 @@ export default function App() {
   }
 
   return <MitigationPlannerPage tl={tl} />;
+}
+
+export default function App() {
+  const [view, setView] = useState<AppView>(() => getCurrentAppView());
+
+  useEffect(() => {
+    const onHashChange = () => setView(getCurrentAppView());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  if (view === "activity") {
+    return <ActivityRecordPage />;
+  }
+
+  return <PlannerApp />;
 }

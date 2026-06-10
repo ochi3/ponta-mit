@@ -36,6 +36,13 @@ const zh = {
       duty: "副本",
     },
   },
+  nav: {
+    ariaLabel: "站内导航",
+    siteName: "PONTA",
+    planner: "减伤表",
+    activity: "活动记录",
+    activitySummary: "{days}天 · {duration}",
+  },
   timeline: {
     headers: {
       mechanism: "机制",
