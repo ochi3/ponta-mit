@@ -411,16 +411,6 @@ export const SKILLS_HEALER_SCH = [
     icon: SKILL_ICON["healer.sch.consolation"],
     parentSkillId: "healer.sch.summon_seraph",
   },
-  {
-    id: "healer.sch.seraphism",
-    name: "セラフィズム",
-    fflogsAliases: ["Seraphism"],
-    cooldown_s: 180,
-    duration_s: 20,
-    scope: "range_party",
-    kinds: ["heal", "utility"],
-    icon: SKILL_ICON["healer.sch.seraphism"],
-  },
 ] as const satisfies readonly SkillData[];
 
 export const SKILLS_HEALER_SCH_SECONDARY = [
@@ -506,6 +496,16 @@ export const SKILLS_HEALER_SCH_SECONDARY = [
     scope: "self",
     kinds: ["utility"],
     icon: SKILL_ICON["healer.sch.dissipation"],
+  },
+  {
+    id: "healer.sch.seraphism",
+    name: "セラフィズム",
+    fflogsAliases: ["Seraphism"],
+    cooldown_s: 180,
+    duration_s: 20,
+    scope: "range_party",
+    kinds: ["heal", "utility"],
+    icon: SKILL_ICON["healer.sch.seraphism"],
   },
   {
     id: "healer.sch.deployment",
