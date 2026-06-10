@@ -497,6 +497,14 @@ export const SKILLS_HEALER_SCH_SECONDARY = [
     kinds: ["utility"],
     icon: SKILL_ICON["healer.sch.dissipation"],
   },
+  {
+    id: "healer.sch.deployment",
+    name: "展開",
+    fflogsAliases: ["Deployment"],
+    cooldown_s: 90,
+    scope: "self",
+    kinds: ["utility"],
+  },
 ] as const satisfies readonly SkillData[];
 
 export const SKILLS_HEALER_SGE = [

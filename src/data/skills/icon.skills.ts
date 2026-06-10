@@ -193,6 +193,7 @@ export const SKILL_ICON: Record<string, string> = {
   "healer.sch.lustrate": HEALER_SCH_LUSTRATE,
   "healer.sch.protraction": HEALER_SCH_PROTRACTION,
   "healer.sch.recitation": HEALER_SCH_RECITATION,
+  "healer.sch.deployment": "",
   "healer.sge.kerachole": HEALER_SGE_KERACHOLE,
   "healer.sge.physis_ii": HEALER_SGE_PHYSIS_II,
   "healer.sge.holos": HEALER_SGE_HOLOS,
