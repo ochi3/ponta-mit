@@ -15,6 +15,16 @@ export const SKILLS_RANGED_BRD = [
     kinds: ["mitigation"],
     icon: SKILL_ICON["ranged.brd.troubadour"],
   },
+  {
+    id: "ranged.brd.natures_minne",
+    name: "地神のミンネ",
+    fflogsAliases: ["Nature's Minne", "Natures Minne"],
+    cooldown_s: 120,
+    duration_s: 15,
+    scope: "range_party",
+    kinds: ["heal"],
+    icon: SKILL_ICON["ranged.brd.natures_minne"],
+  },
 ] as const satisfies readonly SkillData[];
 
 export const SKILLS_RANGED_MCH = [

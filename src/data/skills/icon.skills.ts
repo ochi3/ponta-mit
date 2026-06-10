@@ -32,6 +32,7 @@ import MELEE_FEINT from "@/assets/icons/skills/melee/feint.png";
 import MELEE_MNK_MANTRA from "@/assets/icons/skills/melee.mnk/mantra.png";
 
 import RANGED_BRD_TROUBADOUR from "@/assets/icons/skills/ranged.brd/troubadour.png";
+import RANGED_BRD_NATURES_MINNE from "@/assets/icons/skills/ranged.brd/natures_minne.png";
 import RANGED_MCH_DISMANTLE from "@/assets/icons/skills/ranged.mch/dismantle.png";
 import RANGED_MCH_TACTICIAN from "@/assets/icons/skills/ranged.mch/tactician.png";
 import RANGED_DNC_SHIELD_SAMBA from "@/assets/icons/skills/ranged.dnc/shield_samba.png";
@@ -95,6 +96,8 @@ import HEALER_SCH_INDOMITABILITY from "@/assets/icons/skills/healer.sch/indomita
 import HEALER_SCH_LUSTRATE from "@/assets/icons/skills/healer.sch/lustrate.png";
 import HEALER_SCH_PROTRACTION from "@/assets/icons/skills/healer.sch/protraction.png";
 import HEALER_SCH_RECITATION from "@/assets/icons/skills/healer.sch/recitation.png";
+import HEALER_SCH_DEPLOYMENT from "@/assets/icons/skills/healer.sch/deployment.png";
+import HEALER_SCH_SERAPHISM from "@/assets/icons/skills/healer.sch/seraphism.png";
 
 import HEALER_SGE_KERACHOLE from "@/assets/icons/skills/healer.sge/kerachole.png";
 import HEALER_SGE_PHYSIS_II from "@/assets/icons/skills/healer.sge/physis_ii.png";
@@ -141,6 +144,7 @@ export const SKILL_ICON: Record<string, string> = {
   "melee.feint": MELEE_FEINT,
   "melee.mnk.mantra": MELEE_MNK_MANTRA,
   "ranged.brd.troubadour": RANGED_BRD_TROUBADOUR,
+  "ranged.brd.natures_minne": RANGED_BRD_NATURES_MINNE,
   "ranged.mch.tactician": RANGED_MCH_TACTICIAN,
   "ranged.mch.dismantle": RANGED_MCH_DISMANTLE,
   "ranged.dnc.shield_samba": RANGED_DNC_SHIELD_SAMBA,
@@ -193,7 +197,8 @@ export const SKILL_ICON: Record<string, string> = {
   "healer.sch.lustrate": HEALER_SCH_LUSTRATE,
   "healer.sch.protraction": HEALER_SCH_PROTRACTION,
   "healer.sch.recitation": HEALER_SCH_RECITATION,
-  "healer.sch.deployment": "",
+  "healer.sch.deployment": HEALER_SCH_DEPLOYMENT,
+  "healer.sch.seraphism": HEALER_SCH_SERAPHISM,
   "healer.sge.kerachole": HEALER_SGE_KERACHOLE,
   "healer.sge.physis_ii": HEALER_SGE_PHYSIS_II,
   "healer.sge.holos": HEALER_SGE_HOLOS,
