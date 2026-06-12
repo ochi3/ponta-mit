@@ -24,6 +24,7 @@ function resolveBasePath(env: Record<string, string>) {
 
 const maintenancePluginPath = path.resolve(__dirname, 'devtools/maintenancePlugin.ts')
 const astReactionPluginPath = path.resolve(__dirname, 'devtools/astReactionPlugin.ts')
+const bossModExportPluginPath = path.resolve(__dirname, 'devtools/bossModExportPlugin.ts')
 
 type MaintenanceModule = {
   maintenanceDevToolsPlugin: () => Plugin
@@ -31,6 +32,10 @@ type MaintenanceModule = {
 
 type AstReactionModule = {
   astReactionDevToolsPlugin: () => Plugin
+}
+
+type BossModExportModule = {
+  bossModExportDevToolsPlugin: () => Plugin
 }
 
 async function loadDevOnlyPlugins(mode: string): Promise<Plugin[]> {
@@ -42,10 +47,9 @@ async function loadDevOnlyPlugins(mode: string): Promise<Plugin[]> {
 
   if (existsSync(maintenancePluginPath)) {
     try {
-      // Vite が config 読み込み時に TS を解決・バンドルするため相対パスで import する
-      const module = (await import(
-        "./devtools/maintenancePlugin.ts"
-      )) as MaintenanceModule
+      // devtools/ は .gitignore 対象。CI では型解決できないが dev 時のみ実行される
+      // @ts-ignore -- ローカル専用プラグイン
+      const module = (await import("./devtools/maintenancePlugin.ts")) as MaintenanceModule
       plugins.push(module.maintenanceDevToolsPlugin())
     } catch (error) {
       console.warn(
@@ -64,6 +68,20 @@ async function loadDevOnlyPlugins(mode: string): Promise<Plugin[]> {
     } catch (error) {
       console.warn(
         '[vite] AST reaction dev plugin を読み込めませんでした:',
+        error instanceof Error ? error.message : error
+      )
+    }
+  }
+
+  if (existsSync(bossModExportPluginPath)) {
+    try {
+      const module = (await import(
+        pathToFileURL(bossModExportPluginPath).href
+      )) as BossModExportModule
+      plugins.push(module.bossModExportDevToolsPlugin())
+    } catch (error) {
+      console.warn(
+        '[vite] BossMod export dev plugin を読み込めませんでした:',
         error instanceof Error ? error.message : error
       )
     }

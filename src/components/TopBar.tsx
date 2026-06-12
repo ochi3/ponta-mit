@@ -14,6 +14,10 @@ import {
 } from "../data/activity-records/registry";
 import { computeActivityRecordStats } from "../logic/activityRecordStats";
 import { encodeShareUrl } from "../logic/share";
+import {
+    downloadSkillTimingText,
+    formatSkillTimingExport,
+} from "../logic/skillTimingExport";
 import SiteBrandingNav from "./SiteBrandingNav";
 import { parseTimelineJson } from "../logic/timelineImport";
 import { serializeTimelineJson } from "../logic/timelineExport";
@@ -63,9 +67,12 @@ export default function TopBar({
     const [isFflogsImportOpen, setIsFflogsImportOpen] = useState(false);
     const { t } = useI18n();
     const team = useStore((s) => s.team);
-    const usages = useStore((s) => s.usages);
-    const momentNotes = useStore((s) => s.momentNotes);
     const timelineId = useStore((s) => s.timelineId);
+    const resolvedTimelineId = resolveTimelineId(timelineId || tl.id);
+    const usages = useStore(
+        (s) => s.plansByTimeline[resolvedTimelineId]?.usages ?? s.usages
+    );
+    const momentNotes = useStore((s) => s.momentNotes);
     const layoutPrefs = useStore(
         (s) =>
             s.plansByTimeline[resolveTimelineId(s.timelineId || tl.id)]?.layoutPrefs
@@ -201,6 +208,43 @@ export default function TopBar({
         window.setTimeout(() => URL.revokeObjectURL(url), 0);
     }
 
+    function handleSkillTimingExport() {
+        if (!team.includes("healer.ast")) {
+            window.alert("パーティ編成に占星術師（AST）を追加してから出力してください。");
+            return;
+        }
+
+        const astUsages = usages.filter(
+            (usage) => usage.jobId === "healer.ast"
+        );
+        if (astUsages.length === 0) {
+            window.alert("占星術師のスキル配置がありません。");
+            return;
+        }
+
+        const text = formatSkillTimingExport(astUsages);
+        if (!text) {
+            window.alert("出力できる占星術師スキルがありません。");
+            return;
+        }
+
+        const fileName = `${sanitizeDownloadFileName(resolvedTimelineId)}-ast-skill-times.txt`;
+        downloadSkillTimingText(fileName, text);
+
+        void navigator.clipboard.writeText(text).then(
+            () => {
+                window.alert(
+                    `スキル秒数をクリップボードにコピーしました。\n${fileName} もダウンロードしています。\n\n${text}`
+                );
+            },
+            () => {
+                window.alert(
+                    `スキル秒数を ${fileName} にダウンロードしました（クリップボードへのコピーは失敗）。\n\n${text}`
+                );
+            }
+        );
+    }
+
     const timelineTitle = resolveIntlString(tl.title, undefined);
     const activitySummary = useMemo(() => {
         const book = getBuiltinActivityRecordBook(DEFAULT_ACTIVITY_RECORD_ID);
@@ -286,6 +330,16 @@ export default function TopBar({
 
                 <button type="button" onClick={handleGenerateLink} className={actionButtonClass}>
                     {t("topbar.actions.generateLink")}
+                </button>
+
+                <button
+                    type="button"
+                    onClick={handleSkillTimingExport}
+                    disabled={!team.includes("healer.ast")}
+                    className={secondaryButtonClass}
+                    title="占星術師（AST）の配置済みスキル秒数をテキスト出力"
+                >
+                    AST秒数出力
                 </button>
 
                 {team.length > 0 && (
