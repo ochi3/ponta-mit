@@ -42,8 +42,9 @@ async function loadDevOnlyPlugins(mode: string): Promise<Plugin[]> {
 
   if (existsSync(maintenancePluginPath)) {
     try {
+      // Vite が config 読み込み時に TS を解決・バンドルするため相対パスで import する
       const module = (await import(
-        pathToFileURL(maintenancePluginPath).href
+        "./devtools/maintenancePlugin.ts"
       )) as MaintenanceModule
       plugins.push(module.maintenanceDevToolsPlugin())
     } catch (error) {
