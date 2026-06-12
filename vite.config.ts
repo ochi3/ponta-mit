@@ -47,8 +47,7 @@ async function loadDevOnlyPlugins(mode: string): Promise<Plugin[]> {
 
   if (existsSync(maintenancePluginPath)) {
     try {
-      // devtools/ は .gitignore 対象。CI では型解決できないが dev 時のみ実行される
-      // @ts-ignore -- ローカル専用プラグイン
+      // @ts-expect-error devtools/ は .gitignore 対象。CI では型解決できないが dev 時のみ実行される
       const module = (await import("./devtools/maintenancePlugin.ts")) as MaintenanceModule
       plugins.push(module.maintenanceDevToolsPlugin())
     } catch (error) {
