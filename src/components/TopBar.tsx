@@ -332,15 +332,17 @@ export default function TopBar({
                     {t("topbar.actions.generateLink")}
                 </button>
 
-                <button
-                    type="button"
-                    onClick={handleSkillTimingExport}
-                    disabled={!team.includes("healer.ast")}
-                    className={secondaryButtonClass}
-                    title="占星術師（AST）の配置済みスキル秒数をテキスト出力"
-                >
-                    AST秒数出力
-                </button>
+                {import.meta.env.DEV && (
+                    <button
+                        type="button"
+                        onClick={handleSkillTimingExport}
+                        disabled={!team.includes("healer.ast")}
+                        className={secondaryButtonClass}
+                        title="dev 専用: 占星術師（AST）の配置済みスキル秒数をテキスト出力"
+                    >
+                        AST秒数出力
+                    </button>
+                )}
 
                 {team.length > 0 && (
                     <button
