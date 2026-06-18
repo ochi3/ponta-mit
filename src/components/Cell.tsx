@@ -34,14 +34,18 @@ function CellComponent({
   }, [checked, jobId, skill.id, t, lineIndex, addUsage, removeUsage]);
 
   const isEmpty = color === "none" && shape === "none" && !checked;
+  const overlayTitle =
+    !checked && color !== "none"
+      ? `${skill.name}（他の配置による${color === "red" ? "クールダウン" : "効果時間"}の表示。消すには ✓ のあるマスをクリック）`
+      : skill.name;
 
   return (
     <button
       onClick={onToggle}
       className={`mp-bar ${getColorClass(color)} ${getShapeClass(shape)} ${
         isEmpty ? "mp-bar-empty" : ""
-      }`}
-      title={skill.name}
+      } ${checked && color === "conflict" ? "mp-bar--invalid-placement" : ""}`}
+      title={overlayTitle}
     >
       {checked ? "✓" : ""}
     </button>

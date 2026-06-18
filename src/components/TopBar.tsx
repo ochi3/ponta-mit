@@ -23,6 +23,7 @@ import { parseTimelineJson } from "../logic/timelineImport";
 import { serializeTimelineJson } from "../logic/timelineExport";
 import { useStore } from "../state/store";
 import FflogsTimelineImportDialog from "./FflogsTimelineImportDialog";
+import DevTimelineSecondsPanel from "./DevTimelineSecondsPanel";
 import type { FflogsTimelineImportResult } from "../logic/fflogsTimeline";
 import PhaseTabs from "./PhaseTabs";
 import TeamPicker from "./TeamPicker";
@@ -45,6 +46,7 @@ function sanitizeDownloadFileName(value: string) {
 
 type Props = {
     tl: Timeline;
+    onDevTimelineSecondsChange?: () => void;
     theme: ThemeMode;
     isPracticeMode: boolean;
     onToggleTheme: () => void;
@@ -55,6 +57,7 @@ type Props = {
 
 export default function TopBar({
     tl,
+    onDevTimelineSecondsChange,
     theme,
     isPracticeMode,
     onToggleTheme,
@@ -331,6 +334,13 @@ export default function TopBar({
                 <button type="button" onClick={handleGenerateLink} className={actionButtonClass}>
                     {t("topbar.actions.generateLink")}
                 </button>
+
+                {import.meta.env.DEV && onDevTimelineSecondsChange && (
+                    <DevTimelineSecondsPanel
+                        timeline={tl}
+                        onChange={onDevTimelineSecondsChange}
+                    />
+                )}
 
                 {import.meta.env.DEV && (
                     <button

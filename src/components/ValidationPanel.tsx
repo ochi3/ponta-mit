@@ -5,6 +5,7 @@ import { validatePlan, type ValidationIssue } from "../logic/validation";
 interface ValidationPanelProps {
   className?: string;
   onSelectIssue?: (issue: ValidationIssue) => void;
+  onRemoveIssue?: (issue: ValidationIssue) => void;
 }
 
 function formatTime(sec: number) {
@@ -41,6 +42,7 @@ function getSummaryText(errorCount: number, warningCount: number) {
 export default function ValidationPanel({
   className = "",
   onSelectIssue,
+  onRemoveIssue,
 }: ValidationPanelProps) {
   const usages = useStore((s) => s.usages);
   const deferredUsages = useDeferredValue(usages);
@@ -89,6 +91,7 @@ export default function ValidationPanel({
                     ? formatTime(issue.location.t_sec)
                     : "場所なし";
                   const canSelect = Boolean(issue.location && onSelectIssue);
+                  const canRemove = Boolean(issue.location && onRemoveIssue);
 
                   return (
                     <li
@@ -99,24 +102,36 @@ export default function ValidationPanel({
                       }-${index}`}
                       className={`validation-issue validation-issue--${issue.severity}`}
                     >
-                      <button
-                        type="button"
-                        className="validation-issue-button"
-                        onClick={() => onSelectIssue?.(issue)}
-                        disabled={!canSelect}
-                      >
-                        <span className="validation-issue-meta">
-                          <span className="validation-issue-badge">
-                            {getSeverityLabel(issue.severity)}
+                      <div className="validation-issue-actions">
+                        <button
+                          type="button"
+                          className="validation-issue-button"
+                          onClick={() => onSelectIssue?.(issue)}
+                          disabled={!canSelect}
+                        >
+                          <span className="validation-issue-meta">
+                            <span className="validation-issue-badge">
+                              {getSeverityLabel(issue.severity)}
+                            </span>
+                            <span className="validation-issue-time">
+                              {locationLabel}
+                            </span>
                           </span>
-                          <span className="validation-issue-time">
-                            {locationLabel}
+                          <span className="validation-issue-message">
+                            {issue.message}
                           </span>
-                        </span>
-                        <span className="validation-issue-message">
-                          {issue.message}
-                        </span>
-                      </button>
+                        </button>
+                        {canRemove && (
+                          <button
+                            type="button"
+                            className="validation-issue-remove"
+                            onClick={() => onRemoveIssue?.(issue)}
+                            title="この配置を削除"
+                          >
+                            削除
+                          </button>
+                        )}
+                      </div>
                     </li>
                   );
                 })}

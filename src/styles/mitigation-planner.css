@@ -7,6 +7,7 @@
   --mp-col-mech-w: 4.5rem;
   --mp-sticky-header-offset: 4.75rem;
   --mp-col-time-w: 4.25rem;
+  --mp-col-dev-time-w: 3.75rem;
   --mp-col-event-w: 14rem;
   --mp-col-memo-w: 7.7rem;
   --mp-col-elem-w: 2.35rem;
@@ -673,6 +674,22 @@ td.mp-col-freeze::after {
   width: var(--mp-col-time-w);
   min-width: var(--mp-col-time-w);
   max-width: var(--mp-col-time-w);
+}
+
+/* dev 専用: 参考秒数列 */
+.mp-col-dev-time {
+  width: var(--mp-col-dev-time-w);
+  min-width: var(--mp-col-dev-time-w);
+  max-width: var(--mp-col-dev-time-w);
+}
+
+th.mp-col-dev-time {
+  color: rgb(252 211 77 / 0.9);
+  font-size: 0.7rem;
+}
+
+.mp-dev-time-cell-label {
+  color: rgb(252 211 77 / 0.85);
 }
 
 /* Event column */
@@ -1404,6 +1421,29 @@ td.mp-col-mechanism.mp-col-freeze::after {
   line-height: 1.4;
 }
 
+.validation-issue-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+
+.validation-issue-remove {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(127, 29, 29, 0.35);
+  color: #fecaca;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.validation-issue-remove:hover {
+  background: rgba(153, 27, 27, 0.55);
+}
+
 .validation-issue--error {
   background: rgba(239, 68, 68, 0.15);
   color: #fca5a5;
@@ -1596,6 +1636,11 @@ td.mp-col-mechanism.mp-col-freeze::after {
   top: -1px;
   bottom: -1px;
   z-index: 1;
+}
+
+.mp-bar--invalid-placement {
+  color: #111827;
+  font-weight: 700;
 }
 
 /* ========== Phase filter chips (ALL / P1 / P2) ========== */

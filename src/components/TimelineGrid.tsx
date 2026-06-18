@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, JSX, MouseEvent } from "react";
 import { useStore } from "../state/store";
 import { JOBS } from "../data/jobs/jobs.registry";
@@ -25,6 +25,10 @@ import {
   saveTimelineTimeDisplayMode,
   type TimelineTimeDisplayMode,
 } from "../logic/timelineView";
+import {
+  buildDevDisplaySecondsByMomentKey,
+  getDevDisplaySecForMoment,
+} from "../logic/devTimelineSeconds";
 import {
   TIMELINE_ROW_HEIGHT_PX,
   TIMELINE_VIRTUAL_MIN_ROWS,
@@ -108,6 +112,7 @@ const SKILL_COL_CSS_VAR = "var(--mp-skill-col-w)";
 const SKILL_COL_STACK_CSS_VAR = "var(--mp-skill-col-stack-w)";
 const MECHANISM_COL_CSS_VAR = "var(--mp-col-mech-w)";
 const TIME_COL_CSS_VAR = "var(--mp-col-time-w)";
+const DEV_TIME_COL_CSS_VAR = "var(--mp-col-dev-time-w)";
 const EVENT_COL_CSS_VAR = "var(--mp-col-event-w)";
 const MEMO_COL_CSS_VAR = "var(--mp-col-memo-w)";
 const ELEMENT_COL_CSS_VAR = "var(--mp-col-elem-w)";
@@ -444,6 +449,7 @@ export default function TimelineGrid({
   focusRequestKey,
   scrollToSecond,
   scrollRequestKey,
+  devTimelineSecondsRevision = 0,
 }: {
   tl: Timeline;
   seconds: number[];
@@ -461,6 +467,8 @@ export default function TimelineGrid({
   /** フェーズタブなどからの明示ジャンプ */
   scrollToSecond?: number | null;
   scrollRequestKey?: number;
+  /** dev 用表示秒数の再読み込みトリガー */
+  devTimelineSecondsRevision?: number;
 }) {
   const { t } = useI18n();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -484,6 +492,12 @@ export default function TimelineGrid({
   const [timeDisplayMode, setTimeDisplayMode] = useState<TimelineTimeDisplayMode>(
     loadTimelineTimeDisplayMode
   );
+  const devDisplaySecByMomentKey = useMemo(() => {
+    void devTimelineSecondsRevision;
+    return buildDevDisplaySecondsByMomentKey(tl);
+  }, [devTimelineSecondsRevision, tl]);
+  const showDevTimeColumn =
+    devDisplaySecByMomentKey !== null && devDisplaySecByMomentKey.size > 0;
   const activeMemoWidthPx = memoWidthOverridePx ?? memoWidthPx;
   const tableLayoutStyle = useMemo(
     () =>
@@ -638,6 +652,18 @@ export default function TimelineGrid({
     return set;
   }, [validationIssues]);
 
+  const invalidPlacementKeys = useMemo(() => {
+    const keys = new Set<string>();
+
+    for (const issue of validationIssues) {
+      if (issue.location) {
+        keys.add(validationLocationKey(issue.location));
+      }
+    }
+
+    return keys;
+  }, [validationIssues]);
+
   const cols: Col[] = useMemo(() => {
     const out: Col[] = [];
     for (const jobId of visibleTeam) {
@@ -781,25 +807,38 @@ export default function TimelineGrid({
     cols.length,
   ]);
 
-  const freezeOffsets = useMemo(
-    () => ({
+  const freezeOffsets = useMemo(() => {
+    const beforeTime = hasMechanisms ? [MECHANISM_COL_CSS_VAR] : [];
+    const beforeDev = [...beforeTime, TIME_COL_CSS_VAR];
+    const beforeEvent = showDevTimeColumn
+      ? [...beforeDev, DEV_TIME_COL_CSS_VAR]
+      : beforeDev;
+
+    const sumCols = (cols: string[]) => {
+      if (cols.length === 0) {
+        return "0px";
+      }
+      if (cols.length === 1) {
+        return cols[0];
+      }
+      return `calc(${cols.join(" + ")})`;
+    };
+
+    return {
       mechanism: "0px",
-      time: hasMechanisms ? MECHANISM_COL_CSS_VAR : "0px",
-      event: hasMechanisms
-        ? `calc(${MECHANISM_COL_CSS_VAR} + ${TIME_COL_CSS_VAR})`
-        : TIME_COL_CSS_VAR,
-      memo: hasMechanisms
-        ? `calc(${MECHANISM_COL_CSS_VAR} + ${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR})`
-        : `calc(${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR})`,
-      elem: hasMechanisms
-        ? `calc(${MECHANISM_COL_CSS_VAR} + ${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR} + ${MEMO_COL_CSS_VAR})`
-        : `calc(${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR} + ${MEMO_COL_CSS_VAR})`,
-      damage: hasMechanisms
-        ? `calc(${MECHANISM_COL_CSS_VAR} + ${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR} + ${MEMO_COL_CSS_VAR} + ${ELEMENT_COL_CSS_VAR})`
-        : `calc(${TIME_COL_CSS_VAR} + ${EVENT_COL_CSS_VAR} + ${MEMO_COL_CSS_VAR} + ${ELEMENT_COL_CSS_VAR})`,
-    }),
-    [hasMechanisms]
-  );
+      time: sumCols(beforeTime),
+      devTime: sumCols(beforeDev),
+      event: sumCols(beforeEvent),
+      memo: sumCols([...beforeEvent, EVENT_COL_CSS_VAR]),
+      elem: sumCols([...beforeEvent, EVENT_COL_CSS_VAR, MEMO_COL_CSS_VAR]),
+      damage: sumCols([
+        ...beforeEvent,
+        EVENT_COL_CSS_VAR,
+        MEMO_COL_CSS_VAR,
+        ELEMENT_COL_CSS_VAR,
+      ]),
+    };
+  }, [hasMechanisms, showDevTimeColumn]);
 
   const formatNumber = (value?: number) =>
       typeof value === "number"
@@ -818,6 +857,25 @@ export default function TimelineGrid({
   const { rows, secondLines } = useMemo(
     () => buildRowData(tl, seconds),
     [seconds, tl]
+  );
+
+  const formatRowTimeLabel = useCallback(
+    (row: (typeof rows)[number]) => formatTimelineSec(row.sec, timeDisplayMode),
+    [timeDisplayMode]
+  );
+
+  const formatDevRowTimeLabel = useCallback(
+    (row: (typeof rows)[number]) => {
+      const devDisplaySec = getDevDisplaySecForMoment(
+        devDisplaySecByMomentKey,
+        row.line.moment
+      );
+      if (devDisplaySec === null) {
+        return "";
+      }
+      return formatTimelineSec(devDisplaySec, timeDisplayMode);
+    },
+    [devDisplaySecByMomentKey, timeDisplayMode]
   );
 
   const compactEventView = hideRowsWithoutEvents;
@@ -2009,11 +2067,13 @@ export default function TimelineGrid({
           const effectCount = effectCounts[r];
           const cooldownCount = cooldownCounts[r];
           const checked = checkedRows.has(r);
-          const total = effectCount + cooldownCount;
+          const row = rows[r];
+          const placementKey = `${col.jobId}::${col.skill.id}::${row.sec}::${row.lineIndex}`;
+          const isInvalidPlacement = checked && invalidPlacementKeys.has(placementKey);
 
           let color: "none" | "green" | "red" | "conflict" = "none";
 
-          if (total >= 2) {
+          if (isInvalidPlacement) {
             color = "conflict";
           } else if (effectCount >= 1 || checked) {
             color = "green";
@@ -2092,6 +2152,7 @@ export default function TimelineGrid({
     rows,
     schAetherflowSimulationByJob,
     sgeAddersgallSimulationByJob,
+    invalidPlacementKeys,
     usagesByJobSkill,
     whmLilySimulationByJob,
   ]);
@@ -2566,6 +2627,16 @@ export default function TimelineGrid({
                       : `${t("timeline.headers.time")}(秒)`}
                   </button>
                 </th>
+                {showDevTimeColumn && (
+                  <th
+                    className="p-2 text-left mp-col-dev-time mp-col-freeze mp-col-freeze--middle"
+                    rowSpan={2}
+                    style={freezeStyle(freezeOffsets.devTime)}
+                    title="dev 専用: 参考用の連番秒数"
+                  >
+                    参考秒
+                  </th>
+                )}
                 <th
                   className="p-2 text-left mp-col-event mp-col-freeze mp-col-freeze--middle"
                   rowSpan={2}
@@ -2829,7 +2900,7 @@ export default function TimelineGrid({
                             className="flex w-full items-center gap-1 text-left hover:text-sky-400"
                             title="同期ポイントを設定"
                           >
-                            <span>{formatTimelineSec(row.sec, timeDisplayMode)}</span>
+                            <span className="mp-time-cell-label">{formatRowTimeLabel(row)}</span>
                             {syncSecondsSet.has(row.sec) && (
                               <span
                                 className="inline-block h-2 w-2 rounded-full bg-sky-400"
@@ -2839,7 +2910,7 @@ export default function TimelineGrid({
                           </button>
                         ) : (
                           <span className="flex items-center gap-1">
-                            <span>{formatTimelineSec(row.sec, timeDisplayMode)}</span>
+                            <span className="mp-time-cell-label">{formatRowTimeLabel(row)}</span>
                             {syncSecondsSet.has(row.sec) && (
                               <span
                                 className="inline-block h-2 w-2 rounded-full bg-sky-400"
@@ -2852,6 +2923,20 @@ export default function TimelineGrid({
                         ""
                       )}
                     </td>
+                    {showDevTimeColumn && (
+                      <td
+                        className="p-1 font-mono text-left whitespace-nowrap mp-col-dev-time mp-col-freeze mp-col-freeze--middle"
+                        style={freezeStyle(freezeOffsets.devTime)}
+                      >
+                        {row.line.showTime ? (
+                          <span className="mp-dev-time-cell-label">
+                            {formatDevRowTimeLabel(row)}
+                          </span>
+                        ) : (
+                          ""
+                        )}
+                      </td>
+                    )}
                     <td
                       className="p-1 mp-col-event mp-col-freeze mp-col-freeze--middle"
                       style={freezeStyle(freezeOffsets.event)}

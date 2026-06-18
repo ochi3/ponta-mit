@@ -113,6 +113,7 @@ function resolvePracticeConfig(
 }
 
 export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
+  const [devSecondsRevision, setDevSecondsRevision] = useState(0);
   const [phaseNavFocus, setPhaseNavFocus] = useState<{
     t_sec: number;
     requestKey: number;
@@ -166,6 +167,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   const applySharePayload = useStore((s) => s.applySharePayload);
   const applyPersistedSharedState = useStore((s) => s.applyPersistedSharedState);
   const applyExternalUsage = useStore((s) => s.applyExternalUsage);
+  const removeUsage = useStore((s) => s.removeUsage);
   const markTimelineSaved = useStore((s) => s.markTimelineSaved);
   const shareFromUrlApplied = useRef(false);
   const practiceLayoutRef = useRef<HTMLDivElement | null>(null);
@@ -676,6 +678,19 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     });
   }
 
+  function handleRemoveValidationIssue(issue: ValidationIssue) {
+    if (!issue.location) {
+      return;
+    }
+
+    removeUsage(
+      issue.location.jobId,
+      issue.location.skillId,
+      issue.location.t_sec,
+      issue.location.lineIndex
+    );
+  }
+
   function handleSaveSyncPoint(videoSec: number) {
     if (editingSyncSecond === null) {
       return;
@@ -744,6 +759,9 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
           <div className="w-full px-2 mp-shell">
             <TopBar
               tl={tl}
+              onDevTimelineSecondsChange={() =>
+                setDevSecondsRevision((revision) => revision + 1)
+              }
               theme={theme}
               isPracticeMode={isPracticeMode}
               onToggleTheme={handleToggleTheme}
@@ -752,7 +770,10 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
               onPhaseNavigate={handlePhaseNavigate}
             />
             <Suspense fallback={null}>
-              <ValidationPanel onSelectIssue={handleSelectValidationIssue} />
+              <ValidationPanel
+                onSelectIssue={handleSelectValidationIssue}
+                onRemoveIssue={handleRemoveValidationIssue}
+              />
             </Suspense>
           </div>
         </div>
@@ -807,6 +828,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
                   <TimelineGrid
                     tl={tl}
                     seconds={practiceSeconds}
+                    devTimelineSecondsRevision={devSecondsRevision}
                     jobFilter={practiceSelectedJobId}
                     focusJobId={practiceSelectedJobId}
                     focusSecond={validationFocus?.location.t_sec ?? practiceTimelineSec}
@@ -828,6 +850,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
           <TimelineGrid
             tl={tl}
             seconds={seconds}
+            devTimelineSecondsRevision={devSecondsRevision}
             focusSecond={timelineFocusSecond}
             focusLineIndex={validationFocus?.location.lineIndex}
             focusSkillId={validationFocus?.location.skillId}

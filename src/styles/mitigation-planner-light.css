@@ -7,6 +7,7 @@ body.theme-light :root {
   --mp-col-mech-w: 4.5rem;
   --mp-sticky-header-offset: 4.75rem;
   --mp-col-time-w: 4.25rem;
+  --mp-col-dev-time-w: 3.75rem;
   --mp-col-event-w: 14rem;
   --mp-col-memo-w: 7.7rem;
   --mp-col-elem-w: 2.35rem;
@@ -547,6 +548,21 @@ body.theme-light .mp-col-time {
   width: var(--mp-col-time-w);
   min-width: var(--mp-col-time-w);
   max-width: var(--mp-col-time-w);
+}
+
+body.theme-light .mp-col-dev-time {
+  width: var(--mp-col-dev-time-w);
+  min-width: var(--mp-col-dev-time-w);
+  max-width: var(--mp-col-dev-time-w);
+}
+
+body.theme-light th.mp-col-dev-time {
+  color: rgb(180 83 9 / 0.95);
+  font-size: 0.7rem;
+}
+
+body.theme-light .mp-dev-time-cell-label {
+  color: rgb(146 64 14 / 0.9);
 }
 
 /* Event column */
@@ -1205,6 +1221,29 @@ body.theme-light .validation-issue {
   line-height: 1.4;
 }
 
+body.theme-light .validation-issue-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+
+body.theme-light .validation-issue-remove {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  background: rgba(254, 226, 226, 0.9);
+  color: #b91c1c;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+body.theme-light .validation-issue-remove:hover {
+  background: #fecaca;
+}
+
 body.theme-light .validation-issue--error {
   background: rgba(220, 38, 38, 0.12);
   color: #b91c1c;
@@ -1399,6 +1438,11 @@ body.theme-light .mp-bar.cell-color-conflict {
   top: -1px;
   bottom: -1px;
   z-index: 1;
+}
+
+body.theme-light .mp-bar--invalid-placement {
+  color: #111827;
+  font-weight: 700;
 }
 
 /* ========== Phase filter chips (ALL / P1 / P2) ========== */
