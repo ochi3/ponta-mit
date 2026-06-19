@@ -5,6 +5,12 @@
   "description": "絶妖星乱舞 活動ログ",
   "entries": [
     {
+      "date": "2026-06-18",
+      "duration_min": 150,
+      "progress": "P3突入",
+      "fflogs_url": "https://ja.fflogs.com/reports/tc4zKvYrxRyDjWpX"
+    },
+    {
       "date": "2026-06-17",
       "duration_min": 180,
       "progress": "P2時間切れ(2%)",
