@@ -11,6 +11,16 @@ export interface DevTimelineSecondsConfig {
   anchorStartSec: number;
 }
 
+/** 参考秒列の計算結果（内部 t_sec からのオフセット） */
+export interface DevTimelineSecondsView {
+  offset: number;
+  anchorTSec: number;
+}
+
+const sortedMomentsCache = new Map<string, readonly Moment[]>();
+let cachedViewKey = "";
+let cachedView: DevTimelineSecondsView | null = null;
+
 function sortMoments(moments: readonly Moment[]) {
   return [...moments].sort(
     (a, b) =>
@@ -20,12 +30,21 @@ function sortMoments(moments: readonly Moment[]) {
   );
 }
 
-function storageKey(timelineId: string) {
-  return `${STORAGE_PREFIX}${resolveTimelineId(timelineId)}`;
+function getSortedMoments(timeline: Timeline) {
+  const timelineId = resolveTimelineId(timeline.id);
+  const cacheKey = `${timelineId}::${timeline.version ?? 0}::${timeline.moments.length}`;
+  const cached = sortedMomentsCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const sorted = sortMoments(timeline.moments);
+  sortedMomentsCache.set(cacheKey, sorted);
+  return sorted;
 }
 
-export function momentDevSecondsKey(moment: Moment) {
-  return `${moment.t_sec}::${moment.order ?? 0}::${moment.name}`;
+function storageKey(timelineId: string) {
+  return `${STORAGE_PREFIX}${resolveTimelineId(timelineId)}`;
 }
 
 export function isDevTimelineSecondsEnabled() {
@@ -70,10 +89,14 @@ export function saveDevTimelineSecondsConfig(
   const key = storageKey(timelineId);
   if (!config) {
     window.localStorage.removeItem(key);
+    cachedViewKey = "";
+    cachedView = null;
     return;
   }
 
   window.localStorage.setItem(key, JSON.stringify(config));
+  cachedViewKey = "";
+  cachedView = null;
 }
 
 export function formatMomentOptionLabel(moment: Moment, index: number) {
@@ -82,20 +105,28 @@ export function formatMomentOptionLabel(moment: Moment, index: number) {
   return `#${index + 1} [${moment.t_sec}s] ${moment.name}${orderLabel}`;
 }
 
-/** 開発時のみ: 表示用の連番秒数（内部 t_sec は変更しない） */
-export function buildDevDisplaySecondsByMomentKey(
-  timeline: Timeline
-): Map<string, number> | null {
+/** 開発時のみ: アンカー以降の参考秒（内部 t_sec + オフセット、CD は変更しない） */
+export function buildDevTimelineSecondsView(
+  timeline: Timeline,
+  revision = 0
+): DevTimelineSecondsView | null {
   if (!isDevTimelineSecondsEnabled()) {
     return null;
   }
 
+  const cacheKey = `${resolveTimelineId(timeline.id)}::${revision}`;
+  if (cacheKey === cachedViewKey) {
+    return cachedView;
+  }
+
   const config = loadDevTimelineSecondsConfig(timeline.id);
   if (!config) {
+    cachedViewKey = cacheKey;
+    cachedView = null;
     return null;
   }
 
-  const sortedMoments = sortMoments(timeline.moments);
+  const sortedMoments = getSortedMoments(timeline);
   const { anchorMomentIndex, anchorStartSec } = config;
 
   if (
@@ -103,28 +134,27 @@ export function buildDevDisplaySecondsByMomentKey(
     anchorMomentIndex >= sortedMoments.length ||
     !Number.isFinite(anchorStartSec)
   ) {
+    cachedViewKey = cacheKey;
+    cachedView = null;
     return null;
   }
 
-  const map = new Map<string, number>();
-  for (let index = anchorMomentIndex; index < sortedMoments.length; index++) {
-    map.set(
-      momentDevSecondsKey(sortedMoments[index]),
-      anchorStartSec + (index - anchorMomentIndex)
-    );
-  }
-
-  return map;
+  const anchorTSec = sortedMoments[anchorMomentIndex].t_sec;
+  cachedViewKey = cacheKey;
+  cachedView = {
+    offset: anchorStartSec - anchorTSec,
+    anchorTSec,
+  };
+  return cachedView;
 }
 
-export function getDevDisplaySecForMoment(
-  displaySecByMomentKey: Map<string, number> | null,
-  moment: Moment | undefined
+export function getDevDisplaySecForRow(
+  view: DevTimelineSecondsView | null,
+  tSec: number
 ): number | null {
-  if (!displaySecByMomentKey || !moment) {
+  if (!view || tSec < view.anchorTSec) {
     return null;
   }
 
-  return displaySecByMomentKey.get(momentDevSecondsKey(moment)) ?? null;
+  return tSec + view.offset;
 }
-

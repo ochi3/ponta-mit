@@ -162,8 +162,7 @@ export function isSgeAddersgallGrantSkill(skillId: string) {
 
 export function simulateSgeAddersgall(
   jobId: JobId,
-  usages: readonly PlanUsage[],
-  maxSec: number
+  usages: readonly PlanUsage[]
 ): SgeAddersgallSimulation {
   const manualOverrides = sortUsages(
     usages.filter(
@@ -200,7 +199,6 @@ export function simulateSgeAddersgall(
     }
   }
 
-  const lastSec = Math.max(maxSec, ...usages.map((usage) => usage.t_sec), 0);
   const events: SgeAddersgallProcessEvent[] = [
     ...manualOverrides.map((usage) => ({
       type: "override" as const,
@@ -233,6 +231,14 @@ export function simulateSgeAddersgall(
   let nextGainSec: number | null =
     available < SGE_ADDERSGALL_CAPACITY ? SGE_ADDERSGALL_CYCLE_SECONDS : null;
 
+  const applyGain = (sec: number) => {
+    available = Math.min(SGE_ADDERSGALL_CAPACITY, available + 1);
+    nextGainSec =
+      available < SGE_ADDERSGALL_CAPACITY
+        ? sec + SGE_ADDERSGALL_CYCLE_SECONDS
+        : null;
+  };
+
   const pushResolvedEvent = (
     event: Pick<SgeAddersgallResolvedEvent, "type" | "t_sec" | "lineIndex" | "skillId">
   ) => {
@@ -240,20 +246,6 @@ export function simulateSgeAddersgall(
       ...event,
       availableAfter: available,
       nextGainSecAfter: nextGainSec,
-    });
-  };
-
-  const applyGain = (sec: number) => {
-    available = Math.min(SGE_ADDERSGALL_CAPACITY, available + 1);
-    nextGainSec =
-      available < SGE_ADDERSGALL_CAPACITY
-        ? sec + SGE_ADDERSGALL_CYCLE_SECONDS
-        : null;
-    pushResolvedEvent({
-      type: "gain",
-      t_sec: sec,
-      lineIndex: 0,
-      skillId: SGE_ADDERSGALL_ID,
     });
   };
 
@@ -321,15 +313,60 @@ export function simulateSgeAddersgall(
     });
   }
 
-  applyPendingGainsUntil(lastSec, Number.MAX_SAFE_INTEGER);
   resolvedEvents.sort(compareResolvedEvent);
 
   return {
     manualOverrideKeys,
     useSimulationByUsageKey,
     resolvedEvents,
-    gains: resolvedEvents.filter((event) => event.type === "gain"),
+    gains: [],
   };
+}
+
+/** 行ごとのアダーガル数を一括計算（O(rows + events)） */
+export function buildSgeAddersgallStatesForRows(
+  simulation: SgeAddersgallSimulation,
+  rows: readonly { sec: number; lineIndex: number }[]
+): readonly SgeAddersgallStateSnapshot[] {
+  const states: SgeAddersgallStateSnapshot[] = new Array(rows.length);
+  let available = SGE_INITIAL_ADDERSGALL_COUNT;
+  let nextGainSec: number | null =
+    available < SGE_ADDERSGALL_CAPACITY ? SGE_ADDERSGALL_CYCLE_SECONDS : null;
+  let eventIndex = 0;
+  const events = simulation.resolvedEvents;
+
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+    const row = rows[rowIndex];
+
+    while (
+      eventIndex < events.length &&
+      compareRowPoint(
+        events[eventIndex].t_sec,
+        events[eventIndex].lineIndex,
+        row.sec,
+        row.lineIndex
+      ) <= 0
+    ) {
+      available = events[eventIndex].availableAfter;
+      nextGainSec = events[eventIndex].nextGainSecAfter;
+      eventIndex++;
+    }
+
+    while (
+      nextGainSec !== null &&
+      compareRowPoint(nextGainSec, 0, row.sec, row.lineIndex) <= 0
+    ) {
+      available = Math.min(SGE_ADDERSGALL_CAPACITY, available + 1);
+      nextGainSec =
+        available < SGE_ADDERSGALL_CAPACITY
+          ? nextGainSec + SGE_ADDERSGALL_CYCLE_SECONDS
+          : null;
+    }
+
+    states[rowIndex] = { available, nextGainSec };
+  }
+
+  return states;
 }
 
 export function getSgeAddersgallStateAtPoint(
@@ -348,6 +385,17 @@ export function getSgeAddersgallStateAtPoint(
 
     available = event.availableAfter;
     nextGainSec = event.nextGainSecAfter;
+  }
+
+  while (
+    nextGainSec !== null &&
+    compareRowPoint(nextGainSec, 0, sec, lineIndex) <= 0
+  ) {
+    available = Math.min(SGE_ADDERSGALL_CAPACITY, available + 1);
+    nextGainSec =
+      available < SGE_ADDERSGALL_CAPACITY
+        ? nextGainSec + SGE_ADDERSGALL_CYCLE_SECONDS
+        : null;
   }
 
   return {

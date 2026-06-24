@@ -368,8 +368,7 @@ function validateSageAddersgall(
       continue;
     }
 
-    const maxSec = Math.max(...jobUsages.map((usage) => usage.t_sec), 0);
-    const simulation = simulateSgeAddersgall(jobId, jobUsages, maxSec);
+    const simulation = simulateSgeAddersgall(jobId, jobUsages);
 
     for (const useSimulation of simulation.useSimulationByUsageKey.values()) {
       if (!useSimulation.isSkillReady || useSimulation.isValid) {

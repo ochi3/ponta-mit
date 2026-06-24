@@ -123,7 +123,7 @@ export function buildMitigationEffect(
     return null;
   }
 
-  if (skill.kinds.includes("shield")) {
+  if (skill.kinds.includes("shield") && !skill.kinds.includes("mitigation")) {
     return null;
   }
 
@@ -165,7 +165,7 @@ export function buildTargetMitigationEffect(
     return null;
   }
 
-  if (skill.kinds.includes("shield")) {
+  if (skill.kinds.includes("shield") && !skill.kinds.includes("mitigation")) {
     return null;
   }
 

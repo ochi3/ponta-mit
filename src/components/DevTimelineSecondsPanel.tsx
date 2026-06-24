@@ -66,9 +66,10 @@ export default function DevTimelineSecondsPanel({ timeline, onChange }: Props) {
       {open && (
         <div className="absolute right-0 top-full z-[120] mt-2 w-[min(92vw,28rem)] rounded-lg border border-amber-500/40 bg-slate-950 p-3 text-left shadow-xl">
           <p className="mb-2 text-[11px] leading-relaxed text-slate-300">
-            選んだ行から下のイベントに、参考用の連番秒数（1, 2, 3…）を
+            選んだイベントを基準に、以降の行へ
             <strong className="font-normal text-amber-200">「参考秒」列</strong>
-            だけ表示します。CD 配置やタイムラインの内部秒数は変わりません。
+            を表示します（基準行の差分を全体に加算。同じ秒の行は同じ参考秒）。
+            CD 配置やタイムラインの内部秒数は変わりません。
           </p>
 
           <label className="mb-2 block text-[11px] text-slate-400">

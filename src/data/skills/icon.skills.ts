@@ -102,6 +102,7 @@ import HEALER_SGE_PHYSIS_II from "@/assets/icons/skills/healer.sge/physis_ii.png
 import HEALER_SGE_HOLOS from "@/assets/icons/skills/healer.sge/holos.png";
 import HEALER_SGE_PANHAIMA from "@/assets/icons/skills/healer.sge/panhaima.png";
 import HEALER_SGE_HAIMA from "@/assets/icons/skills/healer.sge/haima.png";
+import HEALER_SGE_EUKRASIA_PROGNOSIS_II from "@/assets/icons/skills/healer.sge/eukrasia_prognosis_ii.png";
 import HEALER_SGE_PNEUMA from "@/assets/icons/skills/healer.sge/pneuma.png";
 import HEALER_SGE_PHILOSOPHIA from "@/assets/icons/skills/healer.sge/philosophia.png";
 import HEALER_SGE_ADDERSGALL from "@/assets/icons/skills/healer.sge/addersgall.png";
@@ -200,6 +201,7 @@ export const SKILL_ICON: Record<string, string> = {
   "healer.sge.holos": HEALER_SGE_HOLOS,
   "healer.sge.panhaima": HEALER_SGE_PANHAIMA,
   "healer.sge.haima": HEALER_SGE_HAIMA,
+  "healer.sge.eukrasia_prognosis_ii": HEALER_SGE_EUKRASIA_PROGNOSIS_II,
   "healer.sge.pneuma": HEALER_SGE_PNEUMA,
   "healer.sge.philosophia": HEALER_SGE_PHILOSOPHIA,
   "healer.sge.addersgall": HEALER_SGE_ADDERSGALL,

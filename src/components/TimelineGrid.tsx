@@ -25,10 +25,7 @@ import {
   saveTimelineTimeDisplayMode,
   type TimelineTimeDisplayMode,
 } from "../logic/timelineView";
-import {
-  buildDevDisplaySecondsByMomentKey,
-  getDevDisplaySecForMoment,
-} from "../logic/devTimelineSeconds";
+import { buildDevTimelineSecondsView } from "../logic/devTimelineSeconds";
 import {
   TIMELINE_ROW_HEIGHT_PX,
   TIMELINE_VIRTUAL_MIN_ROWS,
@@ -90,7 +87,7 @@ import {
   simulateWhmLilies,
 } from "../logic/whmLilies";
 import {
-  getSgeAddersgallStateAtPoint,
+  buildSgeAddersgallStatesForRows,
   isSgeAddersgallSkill,
   isSgeAddersgallSpenderSkill,
   simulateSgeAddersgall,
@@ -492,12 +489,10 @@ export default function TimelineGrid({
   const [timeDisplayMode, setTimeDisplayMode] = useState<TimelineTimeDisplayMode>(
     loadTimelineTimeDisplayMode
   );
-  const devDisplaySecByMomentKey = useMemo(() => {
-    void devTimelineSecondsRevision;
-    return buildDevDisplaySecondsByMomentKey(tl);
+  const devTimelineSecondsView = useMemo(() => {
+    return buildDevTimelineSecondsView(tl, devTimelineSecondsRevision);
   }, [devTimelineSecondsRevision, tl]);
-  const showDevTimeColumn =
-    devDisplaySecByMomentKey !== null && devDisplaySecByMomentKey.size > 0;
+  const showDevTimeColumn = devTimelineSecondsView !== null;
   const activeMemoWidthPx = memoWidthOverridePx ?? memoWidthPx;
   const tableLayoutStyle = useMemo(
     () =>
@@ -840,6 +835,19 @@ export default function TimelineGrid({
     };
   }, [hasMechanisms, showDevTimeColumn]);
 
+  const freezeStyles = useMemo(
+    () => ({
+      mechanism: freezeStyle(freezeOffsets.mechanism),
+      time: freezeStyle(freezeOffsets.time),
+      devTime: freezeStyle(freezeOffsets.devTime),
+      event: freezeStyle(freezeOffsets.event),
+      memo: freezeStyle(freezeOffsets.memo),
+      elem: freezeStyle(freezeOffsets.elem),
+      damage: freezeStyle(freezeOffsets.damage),
+    }),
+    [freezeOffsets]
+  );
+
   const formatNumber = (value?: number) =>
       typeof value === "number"
       ? value.toLocaleString("ja-JP")
@@ -864,20 +872,6 @@ export default function TimelineGrid({
     [timeDisplayMode]
   );
 
-  const formatDevRowTimeLabel = useCallback(
-    (row: (typeof rows)[number]) => {
-      const devDisplaySec = getDevDisplaySecForMoment(
-        devDisplaySecByMomentKey,
-        row.line.moment
-      );
-      if (devDisplaySec === null) {
-        return "";
-      }
-      return formatTimelineSec(devDisplaySec, timeDisplayMode);
-    },
-    [devDisplaySecByMomentKey, timeDisplayMode]
-  );
-
   const compactEventView = hideRowsWithoutEvents;
 
   const displaySecondLines = useMemo(() => {
@@ -894,6 +888,25 @@ export default function TimelineGrid({
     const allowedSecs = new Set(displaySecondLines.map((secInfo) => secInfo.sec));
     return rows.filter((row) => allowedSecs.has(row.sec));
   }, [compactEventView, displaySecondLines, rows]);
+
+  const devRowTimeLabels = useMemo(() => {
+    if (!devTimelineSecondsView) {
+      return null;
+    }
+
+    const { offset, anchorTSec } = devTimelineSecondsView;
+    const labels: string[] = [];
+    labels.length = displayRows.length;
+
+    for (let index = 0; index < displayRows.length; index++) {
+      const row = displayRows[index];
+      if (row.sec >= anchorTSec) {
+        labels[index] = formatTimelineSec(row.sec + offset, timeDisplayMode);
+      }
+    }
+
+    return labels;
+  }, [devTimelineSecondsView, displayRows, timeDisplayMode]);
 
   const displayMechanismRuns = useMemo(
     () =>
@@ -1093,18 +1106,24 @@ export default function TimelineGrid({
 
   const sgeAddersgallSimulationByJob = useMemo(() => {
     const map = new Map<JobId, ReturnType<typeof simulateSgeAddersgall>>();
-    const maxSec = seconds[seconds.length - 1] ?? 0;
-
     for (const jobId of visibleTeam) {
       if (jobId !== "healer.sge") {
         continue;
       }
 
-      map.set(jobId, simulateSgeAddersgall(jobId, usages, maxSec));
+      map.set(jobId, simulateSgeAddersgall(jobId, usages));
     }
 
     return map;
-  }, [seconds, usages, visibleTeam]);
+  }, [usages, visibleTeam]);
+
+  const sgeAddersgallStateByRowByJob = useMemo(() => {
+    const map = new Map<JobId, readonly { available: number; nextGainSec: number | null }[]>();
+    for (const [jobId, simulation] of sgeAddersgallSimulationByJob) {
+      map.set(jobId, buildSgeAddersgallStatesForRows(simulation, rows));
+    }
+    return map;
+  }, [rows, sgeAddersgallSimulationByJob]);
 
   useEffect(() => {
     if (!followTime || focusSecond === null || focusSecond === undefined) {
@@ -1689,15 +1708,12 @@ export default function TimelineGrid({
       }
 
       const sgeAddersgallSimulation = sgeAddersgallSimulationByJob.get(col.jobId);
-      if (isSgeAddersgallSkill(col.skill.id) && sgeAddersgallSimulation) {
+      const sgeAddersgallRowStates = sgeAddersgallStateByRowByJob.get(col.jobId);
+      if (isSgeAddersgallSkill(col.skill.id) && sgeAddersgallSimulation && sgeAddersgallRowStates) {
         for (let r = 0; r < rows.length; r++) {
           const row = rows[r];
           const rowKey = `${col.jobId}::${col.skill.id}::${row.sec}::${row.lineIndex}`;
-          const addersgallState = getSgeAddersgallStateAtPoint(
-            sgeAddersgallSimulation,
-            row.sec,
-            row.lineIndex
-          );
+          const addersgallState = sgeAddersgallRowStates[r];
           const checked = sgeAddersgallSimulation.manualOverrideKeys.has(rowKey);
 
           vis[ci][r] = {
@@ -2152,6 +2168,7 @@ export default function TimelineGrid({
     rows,
     schAetherflowSimulationByJob,
     sgeAddersgallSimulationByJob,
+    sgeAddersgallStateByRowByJob,
     invalidPlacementKeys,
     usagesByJobSkill,
     whmLilySimulationByJob,
@@ -2602,7 +2619,7 @@ export default function TimelineGrid({
                   <th
                     className="p-2 text-left mp-col-mechanism mp-col-freeze mp-col-freeze--first"
                     rowSpan={2}
-                    style={freezeStyle(freezeOffsets.mechanism)}>
+                    style={freezeStyles.mechanism}>
                     {t("timeline.headers.mechanism")}
                   </th>
                 )}
@@ -2611,7 +2628,7 @@ export default function TimelineGrid({
                     hasMechanisms ? "mp-col-freeze--middle" : "mp-col-freeze--first"
                   }`}
                   rowSpan={2}
-                  style={freezeStyle(freezeOffsets.time)}>
+                  style={freezeStyles.time}>
                   <button
                     type="button"
                     onClick={toggleTimeDisplayMode}
@@ -2631,7 +2648,7 @@ export default function TimelineGrid({
                   <th
                     className="p-2 text-left mp-col-dev-time mp-col-freeze mp-col-freeze--middle"
                     rowSpan={2}
-                    style={freezeStyle(freezeOffsets.devTime)}
+                    style={freezeStyles.devTime}
                     title="dev 専用: 参考用の連番秒数"
                   >
                     参考秒
@@ -2640,7 +2657,7 @@ export default function TimelineGrid({
                 <th
                   className="p-2 text-left mp-col-event mp-col-freeze mp-col-freeze--middle"
                   rowSpan={2}
-                  style={freezeStyle(freezeOffsets.event)}>
+                  style={freezeStyles.event}>
                   {t("timeline.headers.event")}
                 </th>
                 <MemoColumnHeader
@@ -2653,13 +2670,13 @@ export default function TimelineGrid({
                 <th
                   className="p-2 text-center mp-col-element mp-col-freeze mp-col-freeze--middle"
                   rowSpan={2}
-                  style={freezeStyle(freezeOffsets.elem)}>
+                  style={freezeStyles.elem}>
                  {t("timeline.headers.element")}
                 </th>
                 <th
                   className="p-2 text-right mp-col-damage mp-col-freeze mp-col-freeze--last"
                   rowSpan={2}
-                  style={freezeStyle(freezeOffsets.damage)}>
+                  style={freezeStyles.damage}>
                   {t("timeline.headers.damage")}
                 </th>
                 {Array.from(jobColspan.entries()).map(([jobId, span]) => {
@@ -2879,7 +2896,7 @@ export default function TimelineGrid({
                       <td
                         className="p-0 mp-col-mechanism mp-col-freeze mp-col-freeze--first"
                         rowSpan={mechanismCell.rowSpan}
-                        style={freezeStyle(freezeOffsets.mechanism)}>
+                        style={freezeStyles.mechanism}>
                         <div className="mp-mechanism-anchor">
                           <div className="mp-mechanism-cell" title={mechanismCell.label}>
                             {mechanismCell.label}
@@ -2891,7 +2908,7 @@ export default function TimelineGrid({
                       className={`p-1 font-mono text-left whitespace-nowrap mp-col-time mp-col-freeze ${
                         hasMechanisms ? "mp-col-freeze--middle" : "mp-col-freeze--first"
                       }`}
-                      style={freezeStyle(freezeOffsets.time)}>
+                      style={freezeStyles.time}>
                       {row.line.showTime ? (
                         onTimeClick ? (
                           <button
@@ -2926,20 +2943,18 @@ export default function TimelineGrid({
                     {showDevTimeColumn && (
                       <td
                         className="p-1 font-mono text-left whitespace-nowrap mp-col-dev-time mp-col-freeze mp-col-freeze--middle"
-                        style={freezeStyle(freezeOffsets.devTime)}
+                        style={freezeStyles.devTime}
                       >
-                        {row.line.showTime ? (
+                        {devRowTimeLabels?.[displayIndex] ? (
                           <span className="mp-dev-time-cell-label">
-                            {formatDevRowTimeLabel(row)}
+                            {devRowTimeLabels[displayIndex]}
                           </span>
-                        ) : (
-                          ""
-                        )}
+                        ) : null}
                       </td>
                     )}
                     <td
                       className="p-1 mp-col-event mp-col-freeze mp-col-freeze--middle"
-                      style={freezeStyle(freezeOffsets.event)}
+                      style={freezeStyles.event}
                       title={[
                         row.line.label,
                         ...(moment?.tags ?? []).map((tag) => MOMENT_TAG_LABELS[tag] ?? tag),
@@ -2964,7 +2979,7 @@ export default function TimelineGrid({
                     </td>
                     <td
                       className="p-1 mp-col-memo mp-col-freeze mp-col-freeze--middle"
-                      style={freezeStyle(freezeOffsets.memo)}
+                      style={freezeStyles.memo}
                     >
                       <MomentNoteInput
                         value={resolveMomentNote(
@@ -2981,12 +2996,12 @@ export default function TimelineGrid({
                     </td>
                     <td
                       className="p-1 text-center mp-col-element mp-col-freeze mp-col-freeze--middle"
-                      style={freezeStyle(freezeOffsets.elem)}>
+                      style={freezeStyles.elem}>
                       {renderElementBadge(moment)}
                     </td>
                     <td
                       className="p-1 text-right mp-col-damage mp-col-freeze mp-col-freeze--last"
-                      style={freezeStyle(freezeOffsets.damage)}>
+                      style={freezeStyles.damage}>
                       <div
                         className="mp-damage-popover-trigger"
                         onMouseEnter={(event) =>
