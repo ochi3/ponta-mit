@@ -1,7 +1,7 @@
 import { getJobSkillIds, JOB_SKILLS } from "../data/skills";
 import type { JobId, JobSkillMode, SkillId } from "../types";
 import { isAstCardSkill, isAstDrawSkill } from "./astCards";
-import { isSgeAddersgallRelatedSkill } from "./sgeAddersgall";
+import { isSgeAddersgallSkill } from "./sgeAddersgall";
 
 export type JobSkillDisplayOptions = {
   expandedJobs: readonly JobId[];
@@ -39,17 +39,11 @@ function shouldIncludeSecondarySkill(
   }
 
   if (jobId === "healer.sge") {
-    const isAddersgallRelated = isSgeAddersgallRelatedSkill(skillId);
-    if (options.isExpanded && options.isAddersgallVisible) {
-      return true;
+    if (isSgeAddersgallSkill(skillId)) {
+      return options.isAddersgallVisible;
     }
-    if (options.isExpanded) {
-      return !isAddersgallRelated;
-    }
-    if (options.isAddersgallVisible) {
-      return isAddersgallRelated;
-    }
-    return false;
+
+    return options.isExpanded;
   }
 
   return true;
@@ -64,10 +58,13 @@ export function resolveDisplayedSkillIds(
     : "normal";
   const isCardVisible =
     skillMode === "normal" && options.cardOnlyJobs.includes(jobId);
+  const isExpanded = options.expandedJobs.includes(jobId);
   const isAddersgallVisible =
     skillMode === "normal" && options.addersgallOnlyJobs.includes(jobId);
-  const isExpanded = options.expandedJobs.includes(jobId);
-  const includeSecondary = isExpanded || isCardVisible || isAddersgallVisible;
+  const includeSecondary =
+    isExpanded ||
+    isCardVisible ||
+    (jobId === "healer.sge" && isAddersgallVisible);
   const skillSet =
     skillMode === "evolve"
       ? JOB_SKILLS[jobId]?.evolve ?? JOB_SKILLS[jobId]

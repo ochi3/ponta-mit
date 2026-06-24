@@ -225,7 +225,7 @@ export default function PracticeIconModePanel({
                             : inactiveToggleClass
                         }
                       >
-                        {section.addersgallOnlyEnabled ? "ガルのみ ON" : "ガルのみ OFF"}
+                        {section.addersgallOnlyEnabled ? "アダ ON" : "アダ OFF"}
                       </button>
                     </div>
                   )}

@@ -75,7 +75,6 @@ import {
 import { isWhmLilySkill, simulateWhmLilies } from "../logic/whmLilies";
 import {
   buildSgeAddersgallStatesForRows,
-  isSgeAddersgallRelatedSkill,
   isSgeAddersgallSkill,
   simulateSgeAddersgall,
 } from "../logic/sgeAddersgall";
@@ -682,11 +681,9 @@ export default function TimelineGrid({
 
   const needsSgeAddersgallSimulation = useMemo(
     () =>
-      cols.some(
-        (col) =>
-          col.jobId === "healer.sge" && isSgeAddersgallRelatedSkill(col.skill.id)
-      ),
-    [cols]
+      addersgallOnlyJobs.includes("healer.sge") &&
+      visibleTeam.includes("healer.sge"),
+    [addersgallOnlyJobs, visibleTeam]
   );
 
   const jobColspan = useMemo(() => {
@@ -2020,12 +2017,12 @@ export default function TimelineGrid({
                             onClick={() => toggleJobAddersgallOnly(jobId)}
                             title={
                               isAddersgallVisible
-                                ? "アダーガル表示を解除"
-                                : "アダーガルを表示"
+                                ? "アダーガル列と計算をオフ"
+                                : "アダーガル列と計算をオン"
                             }
                             aria-pressed={isAddersgallVisible}
                           >
-                            ガル
+                            アダ
                           </button>
                         )}
                       </div>
