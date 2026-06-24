@@ -1,5 +1,6 @@
-import { getJobSkillIds, SKILL_MAP } from "../data/skills";
+import { SKILL_MAP } from "../data/skills";
 import type { JobId, JobSkillMode, PlanUsage, SkillData } from "../types";
+import { resolveDisplayedSkillIds } from "./jobSkillColumns";
 import {
   AST_DRAW_CYCLE_SECONDS,
   buildAstDrawSlots,
@@ -23,8 +24,12 @@ export type PracticeSkillSnapshot = {
 
 export type PracticeSkillFilterOptions = {
   astCardMode?: "hide" | "show" | "only";
+  addersgallOnlyMode?: "hide" | "show" | "only";
   includeAstDraws?: boolean;
   skillMode?: JobSkillMode;
+  cardOnlyJobs?: readonly JobId[];
+  addersgallOnlyJobs?: readonly JobId[];
+  evolveJobs?: readonly JobId[];
 };
 
 function getVisualActiveDuration(skill: SkillData) {
@@ -244,11 +249,22 @@ export function getPracticeSkillsForJob(
   expandedJobs: readonly JobId[],
   options: PracticeSkillFilterOptions = {}
 ) {
-  const visibleSkillIds = getJobSkillIds(
-    jobId,
-    expandedJobs.includes(jobId),
-    options.skillMode ?? "normal"
-  );
+  const skillMode = options.skillMode ?? "normal";
+  const evolveJobs =
+    options.evolveJobs ??
+    (skillMode === "evolve" ? ([jobId] as JobId[]) : []);
+  const cardOnlyJobs =
+    options.cardOnlyJobs ??
+    (options.astCardMode === "only" && jobId === "healer.ast" ? [jobId] : []);
+  const addersgallOnlyJobs =
+    options.addersgallOnlyJobs ??
+    (options.addersgallOnlyMode === "only" && jobId === "healer.sge" ? [jobId] : []);
+  const visibleSkillIds = resolveDisplayedSkillIds(jobId, {
+    expandedJobs,
+    cardOnlyJobs,
+    addersgallOnlyJobs,
+    evolveJobs,
+  });
   const usedSkillIds =
     options.skillMode === "evolve"
       ? []

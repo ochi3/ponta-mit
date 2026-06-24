@@ -35,6 +35,7 @@ type PlannerContentState = {
   layoutPrefs: PlannerLayoutPrefs;
   expandedJobs: JobId[];
   cardOnlyJobs: JobId[];
+  addersgallOnlyJobs: JobId[];
   evolveJobs: JobId[];
   hideRowsWithoutEvents: boolean;
   practice: PracticeSettings;
@@ -50,6 +51,7 @@ type PlannerHistorySnapshot = Pick<
   | "momentNotes"
   | "expandedJobs"
   | "cardOnlyJobs"
+  | "addersgallOnlyJobs"
   | "evolveJobs"
   | "practice"
   | "practiceSelectedJobId"
@@ -64,6 +66,7 @@ type PersistedStore = {
   usages?: PlanUsage[];
   expandedJobs?: JobId[];
   cardOnlyJobs?: JobId[];
+  addersgallOnlyJobs?: JobId[];
   evolveJobs?: JobId[];
 };
 
@@ -78,6 +81,7 @@ type Store = {
   layoutPrefs: PlannerLayoutPrefs;
   expandedJobs: JobId[];
   cardOnlyJobs: JobId[];
+  addersgallOnlyJobs: JobId[];
   evolveJobs: JobId[];
   hideRowsWithoutEvents: boolean;
   undoStackByTimeline: Record<string, PlannerHistorySnapshot[]>;
@@ -92,6 +96,7 @@ type Store = {
   toggleJobExpand(jobId: JobId): void;
   toggleAllJobExpand(): void;
   toggleJobCardOnly(jobId: JobId): void;
+  toggleJobAddersgallOnly(jobId: JobId): void;
   toggleJobEvolve(jobId: JobId): void;
   toggleHideRowsWithoutEvents(): void;
 
@@ -133,7 +138,7 @@ type Store = {
 type TimelineScopedStoreState = Pick<
   Store,
   "timelineId" | "plansByTimeline" | "team" | "usages" | "expandedJobs"
-  | "cardOnlyJobs" | "evolveJobs"
+  | "cardOnlyJobs" | "addersgallOnlyJobs" | "evolveJobs"
 >;
 
 const HISTORY_LIMIT = 50;
@@ -158,6 +163,12 @@ function sortUsages(usages: readonly PlanUsage[]) {
 
 function normalizeExpandedJobs(expandedJobs?: readonly JobId[]) {
   return expandedJobs ? Array.from(new Set(expandedJobs)) : [];
+}
+
+function normalizeAddersgallOnlyJobs(addersgallOnlyJobs?: readonly JobId[]) {
+  return addersgallOnlyJobs
+    ? Array.from(new Set(addersgallOnlyJobs.filter((jobId) => jobId === "healer.sge")))
+    : [];
 }
 
 function normalizeCardOnlyJobs(cardOnlyJobs?: readonly JobId[]) {
@@ -305,6 +316,9 @@ function normalizeContentState(
     cardOnlyJobs: normalizeCardOnlyJobs(merged.cardOnlyJobs).filter((jobId) =>
       team.includes(jobId)
     ),
+    addersgallOnlyJobs: normalizeAddersgallOnlyJobs(
+      merged.addersgallOnlyJobs
+    ).filter((jobId) => team.includes(jobId)),
     evolveJobs: normalizeEvolveJobs(merged.evolveJobs, team),
     hideRowsWithoutEvents:
       merged.hideRowsWithoutEvents ??
@@ -333,6 +347,7 @@ function createHistorySnapshot(
     momentNotes: { ...contentState.momentNotes },
     expandedJobs: [...contentState.expandedJobs],
     cardOnlyJobs: [...contentState.cardOnlyJobs],
+    addersgallOnlyJobs: [...contentState.addersgallOnlyJobs],
     evolveJobs: [...contentState.evolveJobs],
     practice: {
       youtubeUrl: contentState.practice.youtubeUrl,
@@ -388,6 +403,7 @@ function updateTimelineState(
     layoutPrefs: normalizedContentState.layoutPrefs,
     expandedJobs: normalizedContentState.expandedJobs,
     cardOnlyJobs: normalizedContentState.cardOnlyJobs,
+    addersgallOnlyJobs: normalizedContentState.addersgallOnlyJobs,
     evolveJobs: normalizedContentState.evolveJobs,
     hideRowsWithoutEvents: normalizedContentState.hideRowsWithoutEvents,
   };
@@ -450,6 +466,7 @@ function activateTimelineState(
     layoutPrefs: currentContentState.layoutPrefs,
     expandedJobs: currentContentState.expandedJobs,
     cardOnlyJobs: currentContentState.cardOnlyJobs,
+    addersgallOnlyJobs: currentContentState.addersgallOnlyJobs,
     evolveJobs: currentContentState.evolveJobs,
     hideRowsWithoutEvents: currentContentState.hideRowsWithoutEvents,
   };
@@ -469,7 +486,7 @@ function updateTimelineDisplayPrefs(
   prefs: Partial<
     Pick<
       PlannerContentState,
-      "expandedJobs" | "cardOnlyJobs" | "evolveJobs" | "hideRowsWithoutEvents"
+      "expandedJobs" | "cardOnlyJobs" | "addersgallOnlyJobs" | "evolveJobs" | "hideRowsWithoutEvents"
     >
   >
 ) {
@@ -543,6 +560,7 @@ function mergePersistedState(
     persistedState.usages !== undefined ||
     persistedState.expandedJobs !== undefined ||
     persistedState.cardOnlyJobs !== undefined ||
+    persistedState.addersgallOnlyJobs !== undefined ||
     persistedState.evolveJobs !== undefined
   ) {
     const legacyTimelineId = normalizeTimelineId(
@@ -555,6 +573,8 @@ function mergePersistedState(
         usages: persistedState.usages ?? legacyBase?.usages,
         expandedJobs: persistedState.expandedJobs ?? legacyBase?.expandedJobs,
         cardOnlyJobs: persistedState.cardOnlyJobs ?? legacyBase?.cardOnlyJobs,
+        addersgallOnlyJobs:
+          persistedState.addersgallOnlyJobs ?? legacyBase?.addersgallOnlyJobs,
         evolveJobs: persistedState.evolveJobs ?? legacyBase?.evolveJobs,
       },
       legacyBase
@@ -589,6 +609,7 @@ function mergePersistedState(
     layoutPrefs: activeContentState.layoutPrefs,
     expandedJobs: activeContentState.expandedJobs,
     cardOnlyJobs: activeContentState.cardOnlyJobs,
+    addersgallOnlyJobs: activeContentState.addersgallOnlyJobs,
     evolveJobs: activeContentState.evolveJobs,
     hideRowsWithoutEvents: activeContentState.hideRowsWithoutEvents,
   } satisfies Store;
@@ -609,6 +630,7 @@ export const useStore = create<Store>()(
       layoutPrefs: {},
       expandedJobs: [],
       cardOnlyJobs: [],
+      addersgallOnlyJobs: [],
       evolveJobs: [],
       hideRowsWithoutEvents: false,
       undoStackByTimeline: {},
@@ -729,6 +751,24 @@ export const useStore = create<Store>()(
 
           return updateTimelineDisplayPrefs(state, timelineId, {
             cardOnlyJobs: nextCardOnlyJobs,
+          });
+        }),
+
+      toggleJobAddersgallOnly: (jobId) =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          const nextAddersgallOnlyJobs =
+            jobId !== "healer.sge"
+              ? contentState.addersgallOnlyJobs
+              : contentState.addersgallOnlyJobs.includes(jobId)
+                ? contentState.addersgallOnlyJobs.filter(
+                    (addersgallOnlyJobId) => addersgallOnlyJobId !== jobId
+                  )
+                : [...contentState.addersgallOnlyJobs, jobId];
+
+          return updateTimelineDisplayPrefs(state, timelineId, {
+            addersgallOnlyJobs: nextAddersgallOnlyJobs,
           });
         }),
 
@@ -900,6 +940,9 @@ export const useStore = create<Store>()(
               nextTeam
             ),
             cardOnlyJobs: contentState.cardOnlyJobs.filter((jobId) =>
+              nextTeam.includes(jobId)
+            ),
+            addersgallOnlyJobs: contentState.addersgallOnlyJobs.filter((jobId) =>
               nextTeam.includes(jobId)
             ),
             practice: syncPracticeSelection(nextTeam, contentState.practice),
@@ -1086,6 +1129,7 @@ export const useStore = create<Store>()(
                       )
                     : localContentState.evolveJobs,
                 cardOnlyJobs: localContentState.cardOnlyJobs,
+                addersgallOnlyJobs: localContentState.addersgallOnlyJobs,
                 practice:
                   payload.practice !== undefined
                     ? {
@@ -1130,6 +1174,7 @@ export const useStore = create<Store>()(
                     : state.plansByTimeline[timelineId]?.layoutPrefs,
                 expandedJobs: localContentState.expandedJobs,
                 cardOnlyJobs: localContentState.cardOnlyJobs,
+                addersgallOnlyJobs: localContentState.addersgallOnlyJobs,
                 evolveJobs: localContentState.evolveJobs,
                 practice:
                   payload.practice !== undefined
@@ -1184,6 +1229,7 @@ export const useStore = create<Store>()(
                     : contentState.layoutPrefs,
                 expandedJobs: contentState.expandedJobs,
                 cardOnlyJobs: contentState.cardOnlyJobs,
+                addersgallOnlyJobs: contentState.addersgallOnlyJobs,
                 evolveJobs: contentState.evolveJobs,
                 practice:
                   syncedPayload.practice !== undefined

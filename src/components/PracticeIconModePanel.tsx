@@ -50,6 +50,7 @@ export default function PracticeIconModePanel({
   const evolveJobs = useStore((state) => state.evolveJobs);
   const toggleJobExpand = useStore((state) => state.toggleJobExpand);
   const [cardOnlyJobIds, setCardOnlyJobIds] = useState<JobId[]>([]);
+  const [addersgallOnlyJobIds, setAddersgallOnlyJobIds] = useState<JobId[]>([]);
   const isLight = theme === "light";
   const jobIds = useMemo(
     () =>
@@ -61,6 +62,7 @@ export default function PracticeIconModePanel({
 
   useEffect(() => {
     setCardOnlyJobIds((prev) => prev.filter((jobId) => jobIds.includes(jobId)));
+    setAddersgallOnlyJobIds((prev) => prev.filter((jobId) => jobIds.includes(jobId)));
   }, [jobIds]);
 
   const jobSections = useMemo(
@@ -73,22 +75,32 @@ export default function PracticeIconModePanel({
           jobIcon: getJobIcon(jobId),
           hasSecondary: hasSecondarySkills(jobId, skillMode),
           hasCards: jobId === "healer.ast",
+          hasAddersgall: jobId === "healer.sge",
           personalEnabled: expandedJobs.includes(jobId),
           cardsOnlyEnabled: cardOnlyJobIds.includes(jobId),
+          addersgallOnlyEnabled: addersgallOnlyJobIds.includes(jobId),
           snapshots: getPracticeSkillsForJob(jobId, usages, expandedJobs, {
             astCardMode: cardOnlyJobIds.includes(jobId)
               ? "only"
               : jobId === "healer.ast"
                 ? "show"
                 : "hide",
+            addersgallOnlyMode: addersgallOnlyJobIds.includes(jobId)
+              ? "only"
+              : jobId === "healer.sge"
+                ? "show"
+                : "hide",
             includeAstDraws: false,
             skillMode,
+            cardOnlyJobs: cardOnlyJobIds,
+            addersgallOnlyJobs: addersgallOnlyJobIds,
+            evolveJobs,
           }).map((skill) =>
             getPracticeSkillSnapshot(jobId, skill, usages, currentTimelineSec)
           ),
         };
       }),
-    [cardOnlyJobIds, currentTimelineSec, evolveJobs, expandedJobs, jobIds, usages]
+    [addersgallOnlyJobIds, cardOnlyJobIds, currentTimelineSec, evolveJobs, expandedJobs, jobIds, usages]
   );
 
   const panelClass = isLight
@@ -190,6 +202,30 @@ export default function PracticeIconModePanel({
                         }
                       >
                         {section.cardsOnlyEnabled ? "カードのみ ON" : "カードのみ OFF"}
+                      </button>
+                    </div>
+                  )}
+                  {section.hasAddersgall && (
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[11px] font-semibold ${subtleTextClass}`}>
+                        アダーガル
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddersgallOnlyJobIds((prev) =>
+                            prev.includes(section.jobId)
+                              ? prev.filter((jobId) => jobId !== section.jobId)
+                              : [...prev, section.jobId]
+                          );
+                        }}
+                        className={
+                          section.addersgallOnlyEnabled
+                            ? activeToggleClass
+                            : inactiveToggleClass
+                        }
+                      >
+                        {section.addersgallOnlyEnabled ? "ガルのみ ON" : "ガルのみ OFF"}
                       </button>
                     </div>
                   )}

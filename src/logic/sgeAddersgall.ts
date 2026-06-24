@@ -160,6 +160,14 @@ export function isSgeAddersgallGrantSkill(skillId: string) {
   return skillId === SGE_RHIZOMATA_ID;
 }
 
+export function isSgeAddersgallRelatedSkill(skillId: string) {
+  return (
+    isSgeAddersgallSkill(skillId) ||
+    isSgeAddersgallSpenderSkill(skillId) ||
+    isSgeAddersgallGrantSkill(skillId)
+  );
+}
+
 export function simulateSgeAddersgall(
   jobId: JobId,
   usages: readonly PlanUsage[]

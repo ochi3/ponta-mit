@@ -2,7 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { CSSProperties, DragEvent, JSX, MouseEvent } from "react";
 import { useStore } from "../state/store";
 import { JOBS } from "../data/jobs/jobs.registry";
-import { JOB_SKILLS, SKILL_MAP, hasSecondarySkills, getJobSkillIds } from "../data/skills";
+import { SKILL_MAP, hasSecondarySkills } from "../data/skills";
+import { resolveDisplayedSkillIds } from "../logic/jobSkillColumns";
 import type {
   Timeline,
   JobId,
@@ -63,7 +64,6 @@ import { validatePlan, type ValidationIssue } from "../logic/validation";
 import {
   buildAstDrawSlots,
   getAstCycleIndex,
-  isAstCardSkill,
   isAstDrawSkill,
 } from "../logic/astCards";
 import { isChargeSkill } from "../logic/skillCharges";
@@ -75,6 +75,7 @@ import {
 import { isWhmLilySkill, simulateWhmLilies } from "../logic/whmLilies";
 import {
   buildSgeAddersgallStatesForRows,
+  isSgeAddersgallRelatedSkill,
   isSgeAddersgallSkill,
   simulateSgeAddersgall,
 } from "../logic/sgeAddersgall";
@@ -504,9 +505,11 @@ export default function TimelineGrid({
   const expandedJobs = useStore((s) => s.expandedJobs);
   const hideRowsWithoutEvents = useStore((s) => s.hideRowsWithoutEvents);
   const cardOnlyJobs = useStore((s) => s.cardOnlyJobs);
+  const addersgallOnlyJobs = useStore((s) => s.addersgallOnlyJobs);
   const evolveJobs = useStore((s) => s.evolveJobs);
   const toggleJobExpand = useStore((s) => s.toggleJobExpand);
   const toggleJobCardOnly = useStore((s) => s.toggleJobCardOnly);
+  const toggleJobAddersgallOnly = useStore((s) => s.toggleJobAddersgallOnly);
   const toggleJobEvolve = useStore((s) => s.toggleJobEvolve);
   const [draggingJobId, setDraggingJobId] = useState<JobId | null>(null);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
@@ -663,35 +666,11 @@ export default function TimelineGrid({
     const out: Col[] = [];
     for (const jobId of visibleTeam) {
       const jobName = JOBS.find((j) => j.id === jobId)?.name ?? jobId;
-      const skillMode = evolveJobs.includes(jobId) ? "evolve" : "normal";
-      const isCardVisible = skillMode === "normal" && cardOnlyJobs.includes(jobId);
-      const isExpanded = expandedJobs.includes(jobId);
-      const includeSecondary = isExpanded || isCardVisible;
-      const skillSet =
-        skillMode === "evolve"
-          ? JOB_SKILLS[jobId]?.evolve ?? JOB_SKILLS[jobId]
-          : JOB_SKILLS[jobId];
-      const secondarySkillIds = new Set(skillSet?.secondary ?? []);
-      const skillIds = getJobSkillIds(jobId, includeSecondary, skillMode).filter((skillId) => {
-        if (!(jobId === "healer.ast" && includeSecondary)) {
-          return true;
-        }
-
-        if (!secondarySkillIds.has(skillId)) {
-          return true;
-        }
-
-        const isCardSkill = isAstCardSkill(skillId) || isAstDrawSkill(skillId);
-        if (isExpanded && isCardVisible) {
-          return true;
-        }
-        if (isExpanded) {
-          return !isCardSkill;
-        }
-        if (isCardVisible) {
-          return isCardSkill;
-        }
-        return false;
+      const skillIds = resolveDisplayedSkillIds(jobId, {
+        expandedJobs,
+        cardOnlyJobs,
+        addersgallOnlyJobs,
+        evolveJobs,
       });
       for (const sid of skillIds) {
         const sk = SKILL_MAP[sid];
@@ -699,7 +678,16 @@ export default function TimelineGrid({
       }
     }
     return out;
-  }, [visibleTeam, expandedJobs, cardOnlyJobs, evolveJobs]);
+  }, [visibleTeam, expandedJobs, cardOnlyJobs, addersgallOnlyJobs, evolveJobs]);
+
+  const needsSgeAddersgallSimulation = useMemo(
+    () =>
+      cols.some(
+        (col) =>
+          col.jobId === "healer.sge" && isSgeAddersgallRelatedSkill(col.skill.id)
+      ),
+    [cols]
+  );
 
   const jobColspan = useMemo(() => {
     const m = new Map<JobId, number>();
@@ -797,6 +785,7 @@ export default function TimelineGrid({
     expandedJobs,
     evolveJobs,
     cardOnlyJobs,
+    addersgallOnlyJobs,
     activeMemoWidthPx,
     jobFilter,
     cols.length,
@@ -1175,6 +1164,10 @@ export default function TimelineGrid({
 
   const sgeAddersgallSimulationByJob = useMemo(() => {
     const map = new Map<JobId, ReturnType<typeof simulateSgeAddersgall>>();
+    if (!needsSgeAddersgallSimulation) {
+      return map;
+    }
+
     for (const jobId of visibleTeam) {
       if (jobId !== "healer.sge") {
         continue;
@@ -1184,7 +1177,7 @@ export default function TimelineGrid({
     }
 
     return map;
-  }, [usages, visibleTeam]);
+  }, [needsSgeAddersgallSimulation, usages, visibleTeam]);
 
   const sgeAddersgallStateByRowByJob = useMemo(() => {
     const map = new Map<JobId, readonly { available: number; nextGainSec: number | null }[]>();
@@ -1945,7 +1938,10 @@ export default function TimelineGrid({
                   const isExpanded = expandedJobs.includes(jobId);
                   const isEvolve = evolveJobs.includes(jobId);
                   const isCardVisible = !isEvolve && cardOnlyJobs.includes(jobId);
+                  const isAddersgallVisible =
+                    !isEvolve && addersgallOnlyJobs.includes(jobId);
                   const canToggleCardOnly = jobId === "healer.ast" && !isEvolve;
+                  const canToggleAddersgallOnly = jobId === "healer.sge" && !isEvolve;
                   const skillMode = isEvolve ? "evolve" : "normal";
                   const hasSecondary = hasSecondarySkills(jobId, skillMode);
                   const isSingleColumnJob = span === 1;
@@ -2014,6 +2010,22 @@ export default function TimelineGrid({
                             aria-pressed={isCardVisible}
                           >
                             札
+                          </button>
+                        )}
+                        {canToggleAddersgallOnly && (
+                          <button
+                            className={`mp-job-extra-btn ${
+                              isAddersgallVisible ? "mp-job-extra-btn--active" : ""
+                            }`}
+                            onClick={() => toggleJobAddersgallOnly(jobId)}
+                            title={
+                              isAddersgallVisible
+                                ? "アダーガル表示を解除"
+                                : "アダーガルを表示"
+                            }
+                            aria-pressed={isAddersgallVisible}
+                          >
+                            ガル
                           </button>
                         )}
                       </div>
