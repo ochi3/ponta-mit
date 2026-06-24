@@ -4,6 +4,134 @@ export const TIMELINE_ROW_HEIGHT_PX = 34;
 /** ビューポート外に余分に描画する行数（上下それぞれ） */
 export const TIMELINE_VIRTUAL_OVERSCAN = 30;
 
+/** これ未満の列数では横仮想化しない */
+export const TIMELINE_HORIZONTAL_VIRTUAL_MIN_COLS = 24;
+
+/** 横方向に余分に描画する列数（左右それぞれ） */
+export const TIMELINE_HORIZONTAL_OVERSCAN = 5;
+
+/** 通常スキル列幅（px）。CSS --mp-skill-col-w: 2.5rem 相当 */
+export const TIMELINE_SKILL_COL_WIDTH_PX = 40;
+
+/** スタック列幅（px）。CSS --mp-skill-col-stack-w: 2.8rem 相当 */
+export const TIMELINE_SKILL_COL_STACK_WIDTH_PX = 45;
+
+export type TimelineHorizontalVirtualRange = {
+  enabled: boolean;
+  start: number;
+  end: number;
+  paddingLeft: number;
+  paddingRight: number;
+};
+
+export function isStackSkillColumn(skill: {
+  maxStacks?: number;
+}): boolean {
+  return typeof skill.maxStacks === "number" && skill.maxStacks > 0;
+}
+
+export function getSkillColumnWidthPx(
+  skill: { maxStacks?: number },
+  isStack = isStackSkillColumn(skill)
+): number {
+  return isStack
+    ? TIMELINE_SKILL_COL_STACK_WIDTH_PX
+    : TIMELINE_SKILL_COL_WIDTH_PX;
+}
+
+export function buildSkillColumnWidths(
+  cols: readonly { skill: { maxStacks?: number } }[],
+  isStackColumn?: (skill: { maxStacks?: number }) => boolean
+): number[] {
+  const resolveStack = isStackColumn ?? isStackSkillColumn;
+  return cols.map((col) => getSkillColumnWidthPx(col.skill, resolveStack(col.skill)));
+}
+
+export function computeHorizontalVirtualRange(
+  columnWidths: readonly number[],
+  scrollLeft: number,
+  viewportWidth: number,
+  overscan = TIMELINE_HORIZONTAL_OVERSCAN,
+  minCols = TIMELINE_HORIZONTAL_VIRTUAL_MIN_COLS
+): TimelineHorizontalVirtualRange {
+  const columnCount = columnWidths.length;
+  if (columnCount < minCols || viewportWidth <= 0) {
+    return {
+      enabled: false,
+      start: 0,
+      end: Math.max(0, columnCount - 1),
+      paddingLeft: 0,
+      paddingRight: 0,
+    };
+  }
+
+  let paddingLeft = 0;
+  let start = 0;
+  for (let index = 0; index < columnCount; index++) {
+    const width = columnWidths[index];
+    if (paddingLeft + width > scrollLeft) {
+      start = index;
+      break;
+    }
+    paddingLeft += width;
+    if (index === columnCount - 1) {
+      start = columnCount - 1;
+    }
+  }
+
+  const visibleRight = scrollLeft + viewportWidth;
+  let end = start;
+  let acc = columnWidths.slice(0, start).reduce((sum, width) => sum + width, 0);
+  for (let index = start; index < columnCount; index++) {
+    acc += columnWidths[index];
+    end = index;
+    if (acc >= visibleRight) {
+      break;
+    }
+  }
+
+  start = Math.max(0, start - overscan);
+  end = Math.min(columnCount - 1, end + overscan);
+
+  paddingLeft = columnWidths.slice(0, start).reduce((sum, width) => sum + width, 0);
+  const paddingRight = columnWidths
+    .slice(end + 1)
+    .reduce((sum, width) => sum + width, 0);
+
+  return {
+    enabled: true,
+    start,
+    end,
+    paddingLeft,
+    paddingRight,
+  };
+}
+
+export type VisibleJobHeaderGroup = {
+  jobId: string;
+  count: number;
+  startIndex: number;
+};
+
+export function groupVisibleJobHeaders(
+  cols: readonly { jobId: string }[],
+  start: number,
+  end: number
+): VisibleJobHeaderGroup[] {
+  const groups: VisibleJobHeaderGroup[] = [];
+  for (let index = start; index <= end; index++) {
+    const col = cols[index];
+    const last = groups[groups.length - 1];
+    if (last && last.jobId === col.jobId) {
+      last.count += 1;
+      continue;
+    }
+    groups.push({ jobId: col.jobId, count: 1, startIndex: index });
+  }
+  return groups;
+}
+
+
 /** これ未満の行数では仮想化しない（短いタイムラインは従来どおり全行描画） */
 export const TIMELINE_VIRTUAL_MIN_ROWS = 120;
 

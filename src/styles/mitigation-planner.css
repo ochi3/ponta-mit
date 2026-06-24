@@ -229,7 +229,8 @@ thead.mp-header-sticky th.mp-col-freeze--last {
 }
 
 /* Cover up skill-bar overflow */
-td.mp-col-freeze::before {
+td.mp-col-freeze::before,
+th.mp-col-freeze::before {
   content: "";
   position: absolute;
   left: 0;
@@ -244,16 +245,12 @@ td.mp-col-freeze::before {
   z-index: -1;
 }
 
-th.mp-col-freeze::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -1px;
-  bottom: -1px;
-  background: #020617;
-  pointer-events: none;
-  z-index: -1;
+td.mp-col-freeze--last::before,
+th.mp-col-freeze--last::before {
+  box-shadow:
+    0 1px 0 #1f2937,
+    0 -1px 0 #1f2937,
+    6px 0 10px rgba(2, 6, 23, 0.45);
 }
 
 /* Vertical line */
@@ -305,6 +302,13 @@ td.mp-col-freeze::after {
   box-shadow:
     0 1px 0 rgba(96, 165, 250, 0.5),
     0 -1px 0 rgba(96, 165, 250, 0.5);
+}
+
+.mp-row--focus td.mp-col-freeze--last::before {
+  box-shadow:
+    0 1px 0 rgba(96, 165, 250, 0.5),
+    0 -1px 0 rgba(96, 165, 250, 0.5),
+    6px 0 10px rgba(2, 6, 23, 0.45);
 }
 
 .mp-row--focus td.mp-col-freeze::after {
@@ -492,6 +496,14 @@ td.mp-col-freeze::after {
   padding-left: 0;
   padding-right: 0;
   box-sizing: border-box;
+}
+
+th.mp-col-virtual-spacer,
+td.mp-col-virtual-spacer {
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  pointer-events: none;
 }
 
 .mp-skill-cell--stack {
