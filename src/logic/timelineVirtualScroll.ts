@@ -24,6 +24,32 @@ export type TimelineHorizontalVirtualRange = {
   paddingRight: number;
 };
 
+export function isSameTimelineVirtualRange(
+  left: TimelineVirtualRange,
+  right: TimelineVirtualRange
+) {
+  return (
+    left.enabled === right.enabled &&
+    left.start === right.start &&
+    left.end === right.end &&
+    left.paddingTop === right.paddingTop &&
+    left.paddingBottom === right.paddingBottom
+  );
+}
+
+export function isSameHorizontalVirtualRange(
+  left: TimelineHorizontalVirtualRange,
+  right: TimelineHorizontalVirtualRange
+) {
+  return (
+    left.enabled === right.enabled &&
+    left.start === right.start &&
+    left.end === right.end &&
+    left.paddingLeft === right.paddingLeft &&
+    left.paddingRight === right.paddingRight
+  );
+}
+
 export function isStackSkillColumn(skill: {
   maxStacks?: number;
 }): boolean {
@@ -55,6 +81,15 @@ export function computeHorizontalVirtualRange(
   minCols = TIMELINE_HORIZONTAL_VIRTUAL_MIN_COLS
 ): TimelineHorizontalVirtualRange {
   const columnCount = columnWidths.length;
+  if (columnCount === 0) {
+    return {
+      enabled: false,
+      start: 0,
+      end: -1,
+      paddingLeft: 0,
+      paddingRight: 0,
+    };
+  }
   if (columnCount < minCols || viewportWidth <= 0) {
     return {
       enabled: false,
@@ -121,6 +156,9 @@ export function groupVisibleJobHeaders(
   const groups: VisibleJobHeaderGroup[] = [];
   for (let index = start; index <= end; index++) {
     const col = cols[index];
+    if (!col) {
+      continue;
+    }
     const last = groups[groups.length - 1];
     if (last && last.jobId === col.jobId) {
       last.count += 1;
@@ -150,6 +188,15 @@ export function computeTimelineVirtualRange(
   rowHeight = TIMELINE_ROW_HEIGHT_PX,
   overscan = TIMELINE_VIRTUAL_OVERSCAN
 ): TimelineVirtualRange {
+  if (rowCount === 0) {
+    return {
+      enabled: false,
+      start: 0,
+      end: -1,
+      paddingTop: 0,
+      paddingBottom: 0,
+    };
+  }
   if (rowCount < TIMELINE_VIRTUAL_MIN_ROWS || viewportHeight <= 0) {
     return {
       enabled: false,

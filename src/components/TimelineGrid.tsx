@@ -36,6 +36,8 @@ import {
   findDisplayIndexForTimelineSec,
   groupVisibleJobHeaders,
   isDisplayIndexInComfortZone,
+  isSameHorizontalVirtualRange,
+  isSameTimelineVirtualRange,
   resolveVirtualMechanismCell,
   scrollWrapperToDisplayIndex,
 } from "../logic/timelineVirtualScroll";
@@ -468,7 +470,14 @@ export default function TimelineGrid({
   const { t } = useI18n();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const gridVisualCacheRef = useRef<Map<string, GridVisualCacheEntry>>(new Map());
-  const horizontalScrollRafRef = useRef<number | null>(null);
+  const scrollSyncRafRef = useRef<number | null>(null);
+  const scrollSyncCacheRef = useRef<{
+    vertical: ReturnType<typeof computeTimelineVirtualRange> | null;
+    horizontal: ReturnType<typeof computeHorizontalVirtualRange> | null;
+  }>({ vertical: null, horizontal: null });
+  const displayRowCountRef = useRef(0);
+  const skillColumnWidthsRef = useRef<number[]>([]);
+  const mechanismLayoutRafRef = useRef<number | null>(null);
   const damagePopoverRef = useRef<HTMLDivElement | null>(null);
   const handledPhaseScrollKeyRef = useRef<number | undefined>(undefined);
   const handledValidationFocusKeyRef = useRef<number | undefined>(undefined);
@@ -749,13 +758,23 @@ export default function TimelineGrid({
       wrapper.style.setProperty("--mp-mechanism-sticky-top", `${mechanismStickyTop}px`);
     };
 
+    const scheduleMechanismLayoutSync = () => {
+      if (mechanismLayoutRafRef.current !== null) {
+        return;
+      }
+      mechanismLayoutRafRef.current = window.requestAnimationFrame(() => {
+        mechanismLayoutRafRef.current = null;
+        syncMechanismLayoutVars();
+      });
+    };
+
     syncMechanismLayoutVars();
 
     const thead = wrapper.querySelector<HTMLElement>("thead.mp-header-sticky");
     const main = wrapper.closest("main");
     const resizeObserver =
       typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(syncMechanismLayoutVars)
+        ? new ResizeObserver(scheduleMechanismLayoutSync)
         : null;
     resizeObserver?.observe(wrapper);
     if (thead) {
@@ -765,17 +784,21 @@ export default function TimelineGrid({
       resizeObserver?.observe(main);
     }
 
-    window.addEventListener("resize", syncMechanismLayoutVars);
-    window.addEventListener("scroll", syncMechanismLayoutVars, { passive: true });
-    window.visualViewport?.addEventListener("resize", syncMechanismLayoutVars);
-    window.visualViewport?.addEventListener("scroll", syncMechanismLayoutVars);
+    window.addEventListener("resize", scheduleMechanismLayoutSync, { passive: true });
+    window.addEventListener("scroll", scheduleMechanismLayoutSync, { passive: true });
+    window.visualViewport?.addEventListener("resize", scheduleMechanismLayoutSync);
+    window.visualViewport?.addEventListener("scroll", scheduleMechanismLayoutSync);
 
     return () => {
       resizeObserver?.disconnect();
-      window.removeEventListener("resize", syncMechanismLayoutVars);
-      window.removeEventListener("scroll", syncMechanismLayoutVars);
-      window.visualViewport?.removeEventListener("resize", syncMechanismLayoutVars);
-      window.visualViewport?.removeEventListener("scroll", syncMechanismLayoutVars);
+      window.removeEventListener("resize", scheduleMechanismLayoutSync);
+      window.removeEventListener("scroll", scheduleMechanismLayoutSync);
+      window.visualViewport?.removeEventListener("resize", scheduleMechanismLayoutSync);
+      window.visualViewport?.removeEventListener("scroll", scheduleMechanismLayoutSync);
+      if (mechanismLayoutRafRef.current !== null) {
+        window.cancelAnimationFrame(mechanismLayoutRafRef.current);
+        mechanismLayoutRafRef.current = null;
+      }
     };
   }, [
     team.length,
@@ -910,40 +933,84 @@ export default function TimelineGrid({
   const [wrapperViewportHeight, setWrapperViewportHeight] = useState(0);
   const [wrapperViewportWidth, setWrapperViewportWidth] = useState(0);
 
+  displayRowCountRef.current = displayRows.length;
+
   useLayoutEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper) {
       return;
     }
 
-    const syncViewport = () => {
-      setVirtualScrollTop(wrapper.scrollTop);
-      setWrapperViewportHeight(wrapper.clientHeight);
-      setWrapperViewportWidth(wrapper.clientWidth);
+    scrollSyncCacheRef.current = { vertical: null, horizontal: null };
 
-      if (horizontalScrollRafRef.current === null) {
-        horizontalScrollRafRef.current = window.requestAnimationFrame(() => {
-          horizontalScrollRafRef.current = null;
-          setVirtualScrollLeft(wrapper.scrollLeft);
-        });
+    const syncDimensions = () => {
+      const nextHeight = wrapper.clientHeight;
+      const nextWidth = wrapper.clientWidth;
+      setWrapperViewportHeight((prev) => (prev === nextHeight ? prev : nextHeight));
+      setWrapperViewportWidth((prev) => (prev === nextWidth ? prev : nextWidth));
+    };
+
+    const syncScroll = () => {
+      scrollSyncRafRef.current = null;
+      const rowCount = displayRowCountRef.current;
+      const columnWidths = skillColumnWidthsRef.current;
+      const scrollTop = wrapper.scrollTop;
+      const scrollLeft = wrapper.scrollLeft;
+      const viewportHeight = wrapper.clientHeight;
+      const viewportWidth = wrapper.clientWidth;
+
+      const nextVertical = computeTimelineVirtualRange(
+        rowCount,
+        scrollTop,
+        viewportHeight,
+        TIMELINE_ROW_HEIGHT_PX
+      );
+      const prevVertical = scrollSyncCacheRef.current.vertical;
+      if (!prevVertical || !isSameTimelineVirtualRange(prevVertical, nextVertical)) {
+        scrollSyncCacheRef.current.vertical = nextVertical;
+        setVirtualScrollTop(scrollTop);
+      }
+
+      const nextHorizontal = computeHorizontalVirtualRange(
+        columnWidths,
+        scrollLeft,
+        viewportWidth
+      );
+      const prevHorizontal = scrollSyncCacheRef.current.horizontal;
+      if (
+        !prevHorizontal ||
+        !isSameHorizontalVirtualRange(prevHorizontal, nextHorizontal)
+      ) {
+        scrollSyncCacheRef.current.horizontal = nextHorizontal;
+        setVirtualScrollLeft(scrollLeft);
       }
     };
 
-    syncViewport();
-    wrapper.addEventListener("scroll", syncViewport, { passive: true });
+    const scheduleScrollSync = () => {
+      if (scrollSyncRafRef.current === null) {
+        scrollSyncRafRef.current = window.requestAnimationFrame(syncScroll);
+      }
+    };
+
+    syncDimensions();
+    scheduleScrollSync();
+    wrapper.addEventListener("scroll", scheduleScrollSync, { passive: true });
 
     const resizeObserver =
       typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(syncViewport)
+        ? new ResizeObserver(() => {
+            syncDimensions();
+            scheduleScrollSync();
+          })
         : null;
     resizeObserver?.observe(wrapper);
 
     return () => {
-      wrapper.removeEventListener("scroll", syncViewport);
+      wrapper.removeEventListener("scroll", scheduleScrollSync);
       resizeObserver?.disconnect();
-      if (horizontalScrollRafRef.current !== null) {
-        window.cancelAnimationFrame(horizontalScrollRafRef.current);
-        horizontalScrollRafRef.current = null;
+      if (scrollSyncRafRef.current !== null) {
+        window.cancelAnimationFrame(scrollSyncRafRef.current);
+        scrollSyncRafRef.current = null;
       }
     };
   }, [displayRows.length, cols.length, hasMechanisms]);
@@ -967,6 +1034,7 @@ export default function TimelineGrid({
       ),
     [cols]
   );
+  skillColumnWidthsRef.current = skillColumnWidths;
 
   const horizontalVirtualRange = useMemo(
     () =>
@@ -985,10 +1053,13 @@ export default function TimelineGrid({
       index <= horizontalVirtualRange.end;
       index++
     ) {
-      indices.push(index);
+      if (index >= 0 && index < cols.length) {
+        indices.push(index);
+      }
     }
     return indices;
   }, [
+    cols.length,
     horizontalVirtualRange.end,
     horizontalVirtualRange.start,
   ]);
@@ -2045,6 +2116,9 @@ export default function TimelineGrid({
                 />
                 {visibleSkillColumnIndices.map((ci) => {
                   const c = cols[ci];
+                  if (!c) {
+                    return null;
+                  }
                   const icon = getSkillIcon(c.skill.id) ?? c.skill.icon;
                   const skillName = c.skill.name;
                   const hasStacks =
@@ -2275,9 +2349,6 @@ export default function TimelineGrid({
                         onMouseEnter={(event) =>
                           updateDamagePopover(summaryRowIndex, event)
                         }
-                        onMouseMove={(event) =>
-                          updateDamagePopover(summaryRowIndex, event)
-                        }
                         onMouseLeave={() => setDamagePopover(null)}
                       >
                         {renderDamageContentAtRow(moment, summaryRowIndex)}
@@ -2291,6 +2362,9 @@ export default function TimelineGrid({
                     />
                     {visibleSkillColumnIndices.map((ci) => {
                       const c = cols[ci];
+                      if (!c) {
+                        return null;
+                      }
                       const isAstDraw = isAstDrawSkill(c.skill.id);
                       const isSchAetherflow = isSchAetherflowSkill(c.skill.id);
                       const isSgeAddersgall = isSgeAddersgallSkill(c.skill.id);

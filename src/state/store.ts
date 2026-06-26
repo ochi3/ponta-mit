@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import {
   DEFAULT_TIMELINE_ID,
+  isBuiltinTimelineId,
   resolveTimelineId,
 } from "../data/timelines/registry";
 import { normalizeTeam } from "../config/jobPriority";
@@ -142,12 +143,92 @@ type TimelineScopedStoreState = Pick<
 >;
 
 const HISTORY_LIMIT = 50;
+export const PLANNER_STORAGE_KEY = "mp-planner-state";
 
 const FALLBACK_STORAGE: StateStorage = {
   getItem: () => null,
   setItem: () => {},
   removeItem: () => {},
 };
+
+function createPlannerStorage(): StateStorage {
+  if (typeof window === "undefined") {
+    return FALLBACK_STORAGE;
+  }
+
+  let persistTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingWrite: { name: string; value: string } | null = null;
+
+  const flushPendingWrite = () => {
+    if (!pendingWrite) {
+      return;
+    }
+    window.localStorage.setItem(pendingWrite.name, pendingWrite.value);
+    pendingWrite = null;
+  };
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("pagehide", flushPendingWrite);
+  }
+
+  return {
+    getItem: (name) => {
+      try {
+        const raw = window.localStorage.getItem(name);
+        if (!raw) {
+          return null;
+        }
+        JSON.parse(raw);
+        return raw;
+      } catch (error) {
+        console.error("[mp-planner-state] 破損した保存データを削除します:", error);
+        window.localStorage.removeItem(name);
+        return null;
+      }
+    },
+    setItem: (name, value) => {
+      pendingWrite = { name, value };
+      if (persistTimer !== null) {
+        window.clearTimeout(persistTimer);
+      }
+      persistTimer = window.setTimeout(() => {
+        persistTimer = null;
+        flushPendingWrite();
+      }, 400);
+    },
+    removeItem: (name) => {
+      if (persistTimer !== null) {
+        window.clearTimeout(persistTimer);
+        persistTimer = null;
+      }
+      pendingWrite = null;
+      window.localStorage.removeItem(name);
+    },
+  };
+}
+
+function asPlansByTimeline(
+  value: unknown
+): Record<string, Partial<PlannerContentState>> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, Partial<PlannerContentState>>;
+}
+
+function resolveStorableTimelineId(
+  timelineId: string,
+  importedTimeline: Timeline | null | undefined
+) {
+  const normalized = normalizeTimelineId(timelineId);
+  if (isBuiltinTimelineId(normalized)) {
+    return normalized;
+  }
+  if (importedTimeline?.id === normalized) {
+    return normalized;
+  }
+  return DEFAULT_TIMELINE_ID;
+}
 
 function normalizeTimelineId(timelineId?: string | null) {
   const trimmed = timelineId?.trim();
@@ -536,7 +617,7 @@ function mergePersistedState(
   const migratedPlans: Record<string, PlannerContentState> = {};
 
   for (const [timelineId, contentState] of Object.entries(
-    persistedState.plansByTimeline ?? {}
+    asPlansByTimeline(persistedState.plansByTimeline)
   )) {
     const normalizedId = normalizeTimelineId(timelineId);
     const existing = migratedPlans[normalizedId];
@@ -581,20 +662,24 @@ function mergePersistedState(
     );
   }
 
-  const timelineId = normalizeTimelineId(
-    persistedState.timelineId ?? currentState.timelineId
+  const storedImportedTimeline = persistedState.importedTimeline
+    ? {
+        ...persistedState.importedTimeline,
+        id: resolveTimelineId(persistedState.importedTimeline.id),
+      }
+    : null;
+  const timelineId = resolveStorableTimelineId(
+    persistedState.timelineId ?? currentState.timelineId,
+    storedImportedTimeline
   );
+  const resolvedImportedTimeline =
+    storedImportedTimeline?.id === timelineId ? storedImportedTimeline : null;
   const activeContentState = getContentState(migratedPlans, timelineId);
 
   return {
     ...currentState,
     timelineId,
-    importedTimeline: persistedState.importedTimeline
-      ? {
-          ...persistedState.importedTimeline,
-          id: resolveTimelineId(persistedState.importedTimeline.id),
-        }
-      : currentState.importedTimeline,
+    importedTimeline: resolvedImportedTimeline,
     practiceDefaultsByTimeline,
     plansByTimeline:
       timelineId in migratedPlans
@@ -1436,10 +1521,8 @@ export const useStore = create<Store>()(
         }),
     }),
     {
-      name: "mp-planner-state",
-      storage: createJSONStorage(() =>
-        typeof window !== "undefined" ? window.localStorage : FALLBACK_STORAGE
-      ),
+      name: PLANNER_STORAGE_KEY,
+      storage: createJSONStorage(() => createPlannerStorage()),
       partialize: (state) => ({
         timelineId: state.timelineId,
         importedTimeline: state.importedTimeline ?? undefined,
