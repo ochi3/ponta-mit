@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { useStore } from "../state/store";
 import { validatePlan, type ValidationIssue } from "../logic/validation";
+import { selectVisibleJobSkillKeys } from "../logic/visibleJobSkills";
 
 interface ValidationPanelProps {
   className?: string;
@@ -45,12 +46,38 @@ export default function ValidationPanel({
   onRemoveIssue,
 }: ValidationPanelProps) {
   const usages = useStore((s) => s.usages);
+  const team = useStore((s) => s.team);
+  const singleJobFilter = useStore((s) => s.singleJobFilter);
+  const expandedJobs = useStore((s) => s.expandedJobs);
+  const cardOnlyJobs = useStore((s) => s.cardOnlyJobs);
+  const addersgallOnlyJobs = useStore((s) => s.addersgallOnlyJobs);
+  const evolveJobs = useStore((s) => s.evolveJobs);
   const deferredUsages = useDeferredValue(usages);
   const [expanded, setExpanded] = useState(false);
 
+  const visibleJobSkillKeys = useMemo(
+    () =>
+      selectVisibleJobSkillKeys({
+        team,
+        jobFilter: singleJobFilter,
+        expandedJobs,
+        cardOnlyJobs,
+        addersgallOnlyJobs,
+        evolveJobs,
+      }),
+    [
+      team,
+      singleJobFilter,
+      expandedJobs,
+      cardOnlyJobs,
+      addersgallOnlyJobs,
+      evolveJobs,
+    ]
+  );
+
   const issues = useMemo(() => {
-    return validatePlan({ usages: deferredUsages });
-  }, [deferredUsages]);
+    return validatePlan({ usages: deferredUsages, visibleJobSkillKeys });
+  }, [deferredUsages, visibleJobSkillKeys]);
 
   const hasIssues = issues.length > 0;
   const errorCount = issues.filter((issue) => issue.severity === "error").length;

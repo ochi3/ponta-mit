@@ -48,6 +48,14 @@ import {
 } from "../logic/timelineGridVisual";
 import { resolveMomentNote } from "../logic/momentNotes";
 import {
+  colsNeedAstDrawSimulation,
+  colsNeedSchAetherflowSimulation,
+  colsNeedSgeAddersgallSimulation,
+  colsNeedWhmLilySimulation,
+  filterUsagesToVisibleSkills,
+  resolveVisibleTeam,
+} from "../logic/visibleJobSkills";
+import {
   clampMemoColumnWidth,
   resolveMemoColumnWidth,
 } from "../logic/layoutPrefs";
@@ -556,10 +564,55 @@ export default function TimelineGrid({
     }, 3000);
   }
   const visibleTeam = useMemo(
-    () => (jobFilter ? team.filter((jobId) => jobId === jobFilter) : team),
+    () => resolveVisibleTeam(team, jobFilter),
     [jobFilter, team]
   );
   const canReorderJobs = !jobFilter && visibleTeam.length > 1;
+
+  const cols: Col[] = useMemo(() => {
+    const out: Col[] = [];
+    for (const jobId of visibleTeam) {
+      const jobName = JOBS.find((j) => j.id === jobId)?.name ?? jobId;
+      const skillIds = resolveDisplayedSkillIds(jobId, {
+        expandedJobs,
+        cardOnlyJobs,
+        addersgallOnlyJobs,
+        evolveJobs,
+      });
+      for (const sid of skillIds) {
+        const sk = SKILL_MAP[sid];
+        if (sk) out.push({ jobId, jobName, skill: sk });
+      }
+    }
+    return out;
+  }, [visibleTeam, expandedJobs, cardOnlyJobs, addersgallOnlyJobs, evolveJobs]);
+
+  const visibleJobSkillKeys = useMemo(
+    () => new Set(cols.map((col) => `${col.jobId}::${col.skill.id}`)),
+    [cols]
+  );
+
+  const visibleUsages = useMemo(
+    () => filterUsagesToVisibleSkills(usages, visibleJobSkillKeys),
+    [usages, visibleJobSkillKeys]
+  );
+
+  const needsAstDrawSimulation = useMemo(
+    () => colsNeedAstDrawSimulation(cols),
+    [cols]
+  );
+  const needsSchAetherflowSimulation = useMemo(
+    () => colsNeedSchAetherflowSimulation(cols),
+    [cols]
+  );
+  const needsWhmLilySimulation = useMemo(
+    () => colsNeedWhmLilySimulation(cols),
+    [cols]
+  );
+  const needsSgeAddersgallSimulation = useMemo(
+    () => colsNeedSgeAddersgallSimulation(cols),
+    [cols]
+  );
 
   function clearJobDragState() {
     setDraggingJobId(null);
@@ -618,15 +671,15 @@ export default function TimelineGrid({
   // Pre-build usage index for O(1) lookup in render
   const usageIndex = useMemo(() => {
     const map = new Map<string, typeof usages[0]>();
-    for (const u of usages) {
+    for (const u of visibleUsages) {
       map.set(`${u.jobId}::${u.skillId}::${u.t_sec}::${u.lineIndex}`, u);
     }
     return map;
-  }, [usages]);
+  }, [visibleUsages]);
 
   const validationIssues = useMemo(() => {
-    return validatePlan({ usages });
-  }, [usages]);
+    return validatePlan({ usages, visibleJobSkillKeys });
+  }, [usages, visibleJobSkillKeys]);
 
   const validationIssuesByLocation = useMemo(() => {
     const map = new Map<string, ValidationIssue>();
@@ -669,31 +722,6 @@ export default function TimelineGrid({
 
     return keys;
   }, [validationIssues]);
-
-  const cols: Col[] = useMemo(() => {
-    const out: Col[] = [];
-    for (const jobId of visibleTeam) {
-      const jobName = JOBS.find((j) => j.id === jobId)?.name ?? jobId;
-      const skillIds = resolveDisplayedSkillIds(jobId, {
-        expandedJobs,
-        cardOnlyJobs,
-        addersgallOnlyJobs,
-        evolveJobs,
-      });
-      for (const sid of skillIds) {
-        const sk = SKILL_MAP[sid];
-        if (sk) out.push({ jobId, jobName, skill: sk });
-      }
-    }
-    return out;
-  }, [visibleTeam, expandedJobs, cardOnlyJobs, addersgallOnlyJobs, evolveJobs]);
-
-  const needsSgeAddersgallSimulation = useMemo(
-    () =>
-      addersgallOnlyJobs.includes("healer.sge") &&
-      visibleTeam.includes("healer.sge"),
-    [addersgallOnlyJobs, visibleTeam]
-  );
 
   const jobColspan = useMemo(() => {
     const m = new Map<JobId, number>();
@@ -1151,7 +1179,7 @@ export default function TimelineGrid({
 
   const usagesByJobSkill = useMemo(() => {
     const map = new Map<string, typeof usages>();
-    for (const usage of usages) {
+    for (const usage of visibleUsages) {
       const key = `${usage.jobId}::${usage.skillId}`;
       if (!map.has(key)) {
         map.set(key, []);
@@ -1159,10 +1187,14 @@ export default function TimelineGrid({
       map.get(key)!.push(usage);
     }
     return map;
-  }, [usages]);
+  }, [visibleUsages]);
 
   const astDrawSlotsByJob = useMemo(() => {
     const map = new Map<JobId, ReturnType<typeof buildAstDrawSlots>>();
+    if (!needsAstDrawSimulation) {
+      return map;
+    }
+
     const maxSec = seconds[seconds.length - 1] ?? 0;
 
     for (const jobId of visibleTeam) {
@@ -1170,11 +1202,11 @@ export default function TimelineGrid({
         continue;
       }
 
-      map.set(jobId, buildAstDrawSlots(jobId, usages, maxSec));
+      map.set(jobId, buildAstDrawSlots(jobId, visibleUsages, maxSec));
     }
 
     return map;
-  }, [seconds, usages, visibleTeam]);
+  }, [needsAstDrawSimulation, seconds, visibleTeam, visibleUsages]);
 
   const astManualDrawUsagesByJobCycle = useMemo(() => {
     const map = new Map<string, readonly PlanUsage[]>();
@@ -1190,6 +1222,10 @@ export default function TimelineGrid({
 
   const schAetherflowSimulationByJob = useMemo(() => {
     const map = new Map<JobId, ReturnType<typeof simulateSchAetherflow>>();
+    if (!needsSchAetherflowSimulation) {
+      return map;
+    }
+
     const maxSec = seconds[seconds.length - 1] ?? 0;
 
     for (const jobId of visibleTeam) {
@@ -1197,11 +1233,11 @@ export default function TimelineGrid({
         continue;
       }
 
-      map.set(jobId, simulateSchAetherflow(jobId, usages, maxSec));
+      map.set(jobId, simulateSchAetherflow(jobId, visibleUsages, maxSec));
     }
 
     return map;
-  }, [seconds, usages, visibleTeam]);
+  }, [needsSchAetherflowSimulation, seconds, visibleTeam, visibleUsages]);
 
   const schAetherflowManualUsagesByJobCycle = useMemo(() => {
     const map = new Map<string, readonly PlanUsage[]>();
@@ -1217,6 +1253,10 @@ export default function TimelineGrid({
 
   const whmLilySimulationByJob = useMemo(() => {
     const map = new Map<JobId, ReturnType<typeof simulateWhmLilies>>();
+    if (!needsWhmLilySimulation) {
+      return map;
+    }
+
     const maxSec = seconds[seconds.length - 1] ?? 0;
 
     for (const jobId of visibleTeam) {
@@ -1224,11 +1264,11 @@ export default function TimelineGrid({
         continue;
       }
 
-      map.set(jobId, simulateWhmLilies(jobId, usages, maxSec));
+      map.set(jobId, simulateWhmLilies(jobId, visibleUsages, maxSec));
     }
 
     return map;
-  }, [seconds, usages, visibleTeam]);
+  }, [needsWhmLilySimulation, seconds, visibleTeam, visibleUsages]);
 
   const sgeAddersgallSimulationByJob = useMemo(() => {
     const map = new Map<JobId, ReturnType<typeof simulateSgeAddersgall>>();
@@ -1241,11 +1281,11 @@ export default function TimelineGrid({
         continue;
       }
 
-      map.set(jobId, simulateSgeAddersgall(jobId, usages));
+      map.set(jobId, simulateSgeAddersgall(jobId, visibleUsages));
     }
 
     return map;
-  }, [needsSgeAddersgallSimulation, usages, visibleTeam]);
+  }, [needsSgeAddersgallSimulation, visibleTeam, visibleUsages]);
 
   const sgeAddersgallStateByRowByJob = useMemo(() => {
     const map = new Map<JobId, readonly { available: number; nextGainSec: number | null }[]>();
@@ -1492,7 +1532,7 @@ export default function TimelineGrid({
   }, [cols, gridVisual, rows]);
 
   const rowMitigationSummaries = useMemo(() => {
-    const validMitigationUsages = usages.flatMap((usage) => {
+    const validMitigationUsages = visibleUsages.flatMap((usage) => {
       const usageKey = `${usage.jobId}::${usage.skillId}::${usage.t_sec}::${usage.lineIndex}`;
       if (!validUsageKeys.has(usageKey)) {
         return [];
@@ -1542,7 +1582,7 @@ export default function TimelineGrid({
 
       return summarizeMitigation(effects, moment.damage, moment.dot);
     });
-  }, [rows, usages, validUsageKeys]);
+  }, [rows, visibleUsages, validUsageKeys]);
 
   const tankDamageSummariesByRow = useMemo(() => {
     const tankJobIds = visibleTeam.filter((jobId) =>
@@ -1553,7 +1593,7 @@ export default function TimelineGrid({
       return [];
     }
 
-    const validMitigationUsages = usages.flatMap((usage) => {
+    const validMitigationUsages = visibleUsages.flatMap((usage) => {
       const usageKey = `${usage.jobId}::${usage.skillId}::${usage.t_sec}::${usage.lineIndex}`;
       if (!validUsageKeys.has(usageKey)) {
         return [];
@@ -1604,7 +1644,7 @@ export default function TimelineGrid({
         };
       });
     });
-  }, [rows, usages, validUsageKeys, visibleTeam]);
+  }, [rows, visibleUsages, validUsageKeys, visibleTeam]);
 
   const renderElementBadge = (moment?: Moment) => {
     const elem = moment?.elem ?? "none";

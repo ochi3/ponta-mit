@@ -82,10 +82,14 @@ export function secondsInPhase(
   let end = 0;
 
   if (phaseId) {
-    const p = tl.phases.find(x => x.id === phaseId);
+    const p = tl.phases.find((x) => x.id === phaseId);
     if (p) {
       start = p.start_sec;
-      end = p.end_sec ?? (tl.moments.length > 0 ? Math.max(...tl.moments.map(m => m.t_sec)) : start);
+      end =
+        p.end_sec ??
+        (tl.moments.length > 0
+          ? Math.max(...tl.moments.map((m) => m.t_sec))
+          : start);
     }
   } else {
     // Total range（0秒・戦闘前の負の秒を含める）
@@ -95,16 +99,19 @@ export function secondsInPhase(
         ...tl.moments.map((m) => m.t_sec),
         ...tl.phases.map((p) => p.start_sec)
       );
-      end = Math.max(...tl.moments.map(m => m.t_sec), ...tl.phases.map(p => p.end_sec ?? 0));
+      end = Math.max(
+        ...tl.moments.map((m) => m.t_sec),
+        ...tl.phases.map((p) => p.end_sec ?? 0)
+      );
     }
-  }
 
-  const preBattleStart = -PRE_BATTLE_TIMELINE_SEC;
-  start = Math.min(start, preBattleStart);
-  if (usageSecs?.length) {
-    start = Math.min(start, ...usageSecs);
+    const preBattleStart = -PRE_BATTLE_TIMELINE_SEC;
+    start = Math.min(start, preBattleStart);
+    if (usageSecs?.length) {
+      start = Math.min(start, ...usageSecs);
+    }
+    start = Math.max(preBattleStart, start);
   }
-  start = Math.max(preBattleStart, start);
 
   const result: number[] = [];
   for (let s = start; s <= end; s++) {

@@ -39,6 +39,8 @@ type PlannerContentState = {
   addersgallOnlyJobs: JobId[];
   evolveJobs: JobId[];
   hideRowsWithoutEvents: boolean;
+  singleJobFilter: JobId | null;
+  activePhaseId: string | null;
   practice: PracticeSettings;
   practiceSelectedJobId: JobId | null;
   needsRemoteSave: boolean;
@@ -85,6 +87,8 @@ type Store = {
   addersgallOnlyJobs: JobId[];
   evolveJobs: JobId[];
   hideRowsWithoutEvents: boolean;
+  singleJobFilter: JobId | null;
+  activePhaseId: string | null;
   undoStackByTimeline: Record<string, PlannerHistorySnapshot[]>;
   redoStackByTimeline: Record<string, PlannerHistorySnapshot[]>;
 
@@ -100,6 +104,8 @@ type Store = {
   toggleJobAddersgallOnly(jobId: JobId): void;
   toggleJobEvolve(jobId: JobId): void;
   toggleHideRowsWithoutEvents(): void;
+  setSingleJobFilter(jobId: JobId | null): void;
+  setActivePhaseId(phaseId: string | null): void;
 
   addUsage(jobId: JobId, skillId: string, t_sec: number, lineIndex: number, stacks?: number): void;
   updateUsageStacks(jobId: JobId, skillId: string, t_sec: number, lineIndex: number, stacks: number): void;
@@ -124,7 +130,6 @@ type Store = {
   setPracticeSelectedJob(jobId: JobId | null): void;
   setPracticeJobVideoSource(jobId: JobId, source: PracticeVideoSource): void;
 
-  applySharePayload(payload: SharePayload): void;
   applyPersistedSharedState(payload: SharePayload, updatedAt?: string | null): void;
   markTimelineSaved(timelineId?: string, updatedAt?: string | null): void;
   applyExternalUsage(event: string, payload: unknown, timelineId?: string): void;
@@ -140,6 +145,7 @@ type TimelineScopedStoreState = Pick<
   Store,
   "timelineId" | "plansByTimeline" | "team" | "usages" | "expandedJobs"
   | "cardOnlyJobs" | "addersgallOnlyJobs" | "evolveJobs"
+  | "hideRowsWithoutEvents" | "singleJobFilter" | "activePhaseId"
 >;
 
 const HISTORY_LIMIT = 50;
@@ -264,6 +270,18 @@ function normalizeEvolveJobs(
 ) {
   const uniqueJobs = evolveJobs ? Array.from(new Set(evolveJobs)) : [];
   return team ? uniqueJobs.filter((jobId) => team.includes(jobId)) : uniqueJobs;
+}
+
+function normalizeSingleJobFilter(
+  singleJobFilter: JobId | null | undefined,
+  team: readonly JobId[]
+) {
+  return singleJobFilter && team.includes(singleJobFilter) ? singleJobFilter : null;
+}
+
+function normalizeActivePhaseId(activePhaseId?: string | null) {
+  const trimmed = activePhaseId?.trim();
+  return trimmed ? trimmed : null;
 }
 
 function normalizePracticeSettings(
@@ -405,6 +423,8 @@ function normalizeContentState(
       merged.hideRowsWithoutEvents ??
       (merged as { hideOutsideMechanismRows?: boolean }).hideOutsideMechanismRows ??
       false,
+    singleJobFilter: normalizeSingleJobFilter(merged.singleJobFilter, team),
+    activePhaseId: normalizeActivePhaseId(merged.activePhaseId),
     practice,
     practiceSelectedJobId: practice.selectedJobId,
     needsRemoteSave: merged.needsRemoteSave ?? false,
@@ -487,6 +507,8 @@ function updateTimelineState(
     addersgallOnlyJobs: normalizedContentState.addersgallOnlyJobs,
     evolveJobs: normalizedContentState.evolveJobs,
     hideRowsWithoutEvents: normalizedContentState.hideRowsWithoutEvents,
+    singleJobFilter: normalizedContentState.singleJobFilter,
+    activePhaseId: normalizedContentState.activePhaseId,
   };
 }
 
@@ -550,6 +572,8 @@ function activateTimelineState(
     addersgallOnlyJobs: currentContentState.addersgallOnlyJobs,
     evolveJobs: currentContentState.evolveJobs,
     hideRowsWithoutEvents: currentContentState.hideRowsWithoutEvents,
+    singleJobFilter: currentContentState.singleJobFilter,
+    activePhaseId: currentContentState.activePhaseId,
   };
 }
 
@@ -568,6 +592,7 @@ function updateTimelineDisplayPrefs(
     Pick<
       PlannerContentState,
       "expandedJobs" | "cardOnlyJobs" | "addersgallOnlyJobs" | "evolveJobs" | "hideRowsWithoutEvents"
+      | "singleJobFilter" | "activePhaseId"
     >
   >
 ) {
@@ -697,6 +722,8 @@ function mergePersistedState(
     addersgallOnlyJobs: activeContentState.addersgallOnlyJobs,
     evolveJobs: activeContentState.evolveJobs,
     hideRowsWithoutEvents: activeContentState.hideRowsWithoutEvents,
+    singleJobFilter: activeContentState.singleJobFilter,
+    activePhaseId: activeContentState.activePhaseId,
   } satisfies Store;
 }
 
@@ -718,6 +745,8 @@ export const useStore = create<Store>()(
       addersgallOnlyJobs: [],
       evolveJobs: [],
       hideRowsWithoutEvents: false,
+      singleJobFilter: null,
+      activePhaseId: null,
       undoStackByTimeline: {},
       redoStackByTimeline: {},
 
@@ -818,6 +847,25 @@ export const useStore = create<Store>()(
           const contentState = getContentState(state.plansByTimeline, timelineId);
           return updateTimelineDisplayPrefs(state, timelineId, {
             hideRowsWithoutEvents: !contentState.hideRowsWithoutEvents,
+          });
+        }),
+
+      setSingleJobFilter: (jobId) =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          const contentState = getContentState(state.plansByTimeline, timelineId);
+          const nextFilter =
+            jobId && contentState.team.includes(jobId) ? jobId : null;
+          return updateTimelineDisplayPrefs(state, timelineId, {
+            singleJobFilter: nextFilter,
+          });
+        }),
+
+      setActivePhaseId: (phaseId) =>
+        set((state) => {
+          const timelineId = normalizeTimelineId(state.timelineId);
+          return updateTimelineDisplayPrefs(state, timelineId, {
+            activePhaseId: normalizeActivePhaseId(phaseId),
           });
         }),
 
@@ -1175,62 +1223,6 @@ export const useStore = create<Store>()(
           };
         }),
 
-      applySharePayload: (payload) => {
-        const timelineId = normalizeTimelineId(payload.timelineId ?? get().timelineId);
-        set((state) => {
-          const localContentState = getContentState(state.plansByTimeline, timelineId);
-          return {
-          importedTimeline: null,
-          practiceDefaultsByTimeline:
-            payload.practice !== undefined && hasTimelinePracticeConfig(payload.practice)
-              ? {
-                  ...state.practiceDefaultsByTimeline,
-                  [timelineId]: normalizeTimelinePracticeConfig(payload.practice),
-                }
-              : state.practiceDefaultsByTimeline,
-          ...activateTimelineState(
-            {
-              ...state,
-              ...updateTimelineState(state, timelineId, {
-                team: payload.team,
-                usages: payload.usages,
-                momentNotes:
-                  payload.momentNotes !== undefined
-                    ? normalizeMomentNotes(payload.momentNotes)
-                    : state.plansByTimeline[timelineId]?.momentNotes,
-                layoutPrefs:
-                  payload.layoutPrefs !== undefined
-                    ? normalizeLayoutPrefs(payload.layoutPrefs)
-                    : state.plansByTimeline[timelineId]?.layoutPrefs,
-                expandedJobs:
-                  payload.expandedJobs !== undefined
-                    ? normalizeExpandedJobs(payload.expandedJobs)
-                    : localContentState.expandedJobs,
-                evolveJobs:
-                  payload.evolveJobs !== undefined
-                    ? normalizeEvolveJobs(
-                        payload.evolveJobs,
-                        payload.team ?? localContentState.team
-                      )
-                    : localContentState.evolveJobs,
-                cardOnlyJobs: localContentState.cardOnlyJobs,
-                addersgallOnlyJobs: localContentState.addersgallOnlyJobs,
-                practice:
-                  payload.practice !== undefined
-                    ? {
-                        ...state.plansByTimeline[timelineId]?.practice,
-                        ...payload.practice,
-                      }
-                    : state.plansByTimeline[timelineId]?.practice,
-                needsRemoteSave: false,
-              }),
-            },
-            timelineId
-          ),
-        };
-        });
-      },
-
       applyPersistedSharedState: (payload, updatedAt) => {
         const timelineId = normalizeTimelineId(payload.timelineId ?? get().timelineId);
         set((state) => {
@@ -1261,6 +1253,8 @@ export const useStore = create<Store>()(
                 cardOnlyJobs: localContentState.cardOnlyJobs,
                 addersgallOnlyJobs: localContentState.addersgallOnlyJobs,
                 evolveJobs: localContentState.evolveJobs,
+                singleJobFilter: localContentState.singleJobFilter,
+                activePhaseId: localContentState.activePhaseId,
                 practice:
                   payload.practice !== undefined
                     ? {

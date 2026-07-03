@@ -13,18 +13,18 @@ import {
     getBuiltinActivityRecordBook,
 } from "../data/activity-records/registry";
 import { computeActivityRecordStats } from "../logic/activityRecordStats";
-import { encodeShareUrl } from "../logic/share";
-import {
-    downloadSkillTimingText,
-    formatSkillTimingExport,
-} from "../logic/skillTimingExport";
 import SiteBrandingNav from "./SiteBrandingNav";
 import { parseTimelineJson } from "../logic/timelineImport";
 import { serializeTimelineJson } from "../logic/timelineExport";
+import { JOBS } from "../data/jobs/jobs.registry";
 import { useStore } from "../state/store";
 import FflogsTimelineImportDialog from "./FflogsTimelineImportDialog";
 import DevTimelineSecondsPanel from "./DevTimelineSecondsPanel";
 import type { FflogsTimelineImportResult } from "../logic/fflogsTimeline";
+import {
+    downloadSkillTimingText,
+    formatSkillTimingExport,
+} from "../logic/skillTimingExport";
 import PhaseTabs from "./PhaseTabs";
 import TeamPicker from "./TeamPicker";
 import { hasAnyPracticeVideo } from "../logic/practiceVideo";
@@ -65,20 +65,12 @@ export default function TopBar({
     onOpenVideoSettings,
     onPhaseNavigate,
 }: Props) {
-    const [shareUrl, setShareUrl] = useState("");
-    const [isCopied, setIsCopied] = useState(false);
-    const [isFflogsImportOpen, setIsFflogsImportOpen] = useState(false);
     const { t } = useI18n();
     const team = useStore((s) => s.team);
     const timelineId = useStore((s) => s.timelineId);
     const resolvedTimelineId = resolveTimelineId(timelineId || tl.id);
     const usages = useStore(
         (s) => s.plansByTimeline[resolvedTimelineId]?.usages ?? s.usages
-    );
-    const momentNotes = useStore((s) => s.momentNotes);
-    const layoutPrefs = useStore(
-        (s) =>
-            s.plansByTimeline[resolveTimelineId(s.timelineId || tl.id)]?.layoutPrefs
     );
     const undo = useStore((s) => s.undo);
     const redo = useStore((s) => s.redo);
@@ -101,6 +93,9 @@ export default function TopBar({
     const evolveJobs = useStore((s) => s.evolveJobs);
     const expandedJobs = useStore((s) => s.expandedJobs);
     const hideRowsWithoutEvents = useStore((s) => s.hideRowsWithoutEvents);
+    const singleJobFilter = useStore((s) => s.singleJobFilter);
+    const activePhaseId = useStore((s) => s.activePhaseId);
+    const setSingleJobFilter = useStore((s) => s.setSingleJobFilter);
     const toggleAllJobExpand = useStore((s) => s.toggleAllJobExpand);
     const toggleHideRowsWithoutEvents = useStore((s) => s.toggleHideRowsWithoutEvents);
     const roomPractice = useStore((s) => s.plansByTimeline[tl.id]?.practice);
@@ -109,6 +104,7 @@ export default function TopBar({
     const setTimelineId = useStore((s) => s.setTimeline);
     const replaceTimelinePlan = useStore((s) => s.replaceTimelinePlan);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isFflogsImportOpen, setIsFflogsImportOpen] = useState(false);
     const isLight = theme === "light";
 
     const practice = hasPracticeConfig(roomPractice)
@@ -117,38 +113,6 @@ export default function TopBar({
             ? contentPractice
             : tl.practice;
 
-    function handleGenerateLink() {
-        const url = encodeShareUrl({
-            v: 1,
-            team,
-            usages,
-            timelineId: timelineId || undefined,
-            momentNotes: Object.keys(momentNotes).length ? momentNotes : undefined,
-            layoutPrefs:
-                layoutPrefs && Object.keys(layoutPrefs).length > 0
-                    ? layoutPrefs
-                    : undefined,
-            practice: practice
-                ? {
-                    youtubeUrl: practice.youtubeUrl,
-                    syncPoints: practice.syncPoints,
-                  }
-                : undefined,
-        });
-        setShareUrl(url);
-        setIsCopied(false);
-    }
-
-    async function handleCopy() {
-        if (!shareUrl) return;
-        try {
-            await navigator.clipboard.writeText(shareUrl);
-            setIsCopied(true);
-            setTimeout(() => setIsCopied(false), 1500);
-        } catch {
-            // Clipboard write may fail (e.g. permission denied).
-        }
-    }
     function handleBuiltinTimelineChange(event: ChangeEvent<HTMLSelectElement>) {
         const id = event.target.value;
         if (id === "__import__") return;
@@ -273,10 +237,6 @@ export default function TopBar({
         ? "relative inline-flex h-8 w-8 items-center justify-center rounded-md border border-rose-200/90 bg-white/80 text-[11px] font-bold text-rose-700 transition-colors duration-150 hover:border-rose-400 hover:bg-rose-50"
         : "relative inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-600 bg-slate-900/70 text-[11px] font-bold text-rose-200 transition-colors duration-150 hover:border-rose-400 hover:bg-slate-800";
 
-    const inputClass = isLight
-        ? "flex-1 rounded-md px-2 py-1 text-xs truncate transition-colors duration-150 bg-white/80 border border-indigo-100 text-slate-800 placeholder:text-slate-400"
-        : "flex-1 rounded-md px-2 py-1 text-xs truncate transition-colors duration-150 bg-slate-900/70 border border-slate-700 text-slate-100";
-
     const copyButtonClass = isLight
         ? "px-2 py-1 rounded-md border text-[11px] transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed border-indigo-200 text-slate-900 bg-white/70 hover:border-indigo-400 hover:bg-indigo-50"
         : "px-2 py-1 rounded-md border text-[11px] transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed border-slate-600 text-slate-100 hover:border-sky-500 hover:bg-slate-900";
@@ -331,9 +291,32 @@ export default function TopBar({
                     </span>
                 </div>
 
-                <button type="button" onClick={handleGenerateLink} className={actionButtonClass}>
-                    {t("topbar.actions.generateLink")}
-                </button>
+                {team.length > 1 && (
+                    <label className={`flex items-center gap-1.5 text-xs ${labelTone}`}>
+                        <span className="whitespace-nowrap">1ジョブ表示</span>
+                        <select
+                            className={`rounded-md px-2 py-1 text-xs max-w-[10rem] ${
+                                isLight
+                                    ? "bg-white/80 border border-slate-300 text-slate-800"
+                                    : "bg-slate-900/70 border border-slate-700 text-slate-100"
+                            }`}
+                            value={singleJobFilter ?? ""}
+                            onChange={(event) =>
+                                setSingleJobFilter(
+                                    event.target.value ? (event.target.value as typeof team[number]) : null
+                                )
+                            }
+                            aria-label="1ジョブのみ表示"
+                        >
+                            <option value="">全員</option>
+                            {team.map((jobId) => (
+                                <option key={jobId} value={jobId}>
+                                    {JOBS.find((job) => job.id === jobId)?.name ?? jobId}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                )}
 
                 {import.meta.env.DEV && onDevTimelineSecondsChange && (
                     <DevTimelineSecondsPanel
@@ -406,23 +389,6 @@ export default function TopBar({
                         <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
                     )}
                 </button>
-
-                <div className="flex items-center gap-1 min-w-48 max-w-[20rem]">
-                    <input
-                        className={inputClass}
-                        readOnly
-                        value={shareUrl}
-                        placeholder={t("topbar.placeholders.share")}
-                    />
-                    <button
-                        type="button"
-                        onClick={handleCopy}
-                        disabled={!shareUrl}
-                        className={copyButtonClass}
-                    >
-                        {isCopied ? t("topbar.actions.copied") : t("topbar.actions.copy")}
-                    </button>
-                </div>
 
             </div>
         </div>
@@ -514,6 +480,7 @@ export default function TopBar({
             <PhaseTabs
               key={tl.id}
               tl={tl}
+              activePhaseId={activePhaseId}
               onPhaseNavigate={onPhaseNavigate}
             />
             </div>

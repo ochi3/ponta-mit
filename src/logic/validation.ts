@@ -8,6 +8,7 @@ import {
 } from "./whmLilies";
 import { simulateSgeAddersgall } from "./sgeAddersgall";
 import { isChildWithinParentWindow } from "./parentChildSkills";
+import { filterUsagesToVisibleSkills } from "./visibleJobSkills";
 
 /** 同一親召喚内の重複チェックを行わない子スキル */
 const CHILD_SKILL_IDS_SKIP_DUPLICATE_PER_PARENT = new Set<string>([
@@ -47,6 +48,8 @@ export interface ValidationIssue {
 
 export interface ValidationContext {
   usages: PlanUsage[];
+  /** 指定時はこの skill キー（jobId::skillId）だけを検証対象にする */
+  visibleJobSkillKeys?: ReadonlySet<string>;
 }
 
 interface ValidationIndexes {
@@ -401,13 +404,15 @@ function validateSageAddersgall(
 }
 
 export function validatePlan(ctx: ValidationContext): ValidationIssue[] {
-  const { usages } = ctx;
+  const activeUsages = ctx.visibleJobSkillKeys
+    ? filterUsagesToVisibleSkills(ctx.usages, ctx.visibleJobSkillKeys)
+    : ctx.usages;
 
-  if (usages.length === 0) {
+  if (activeUsages.length === 0) {
     return [];
   }
 
-  const indexes = buildIndexes(usages);
+  const indexes = buildIndexes(activeUsages);
 
   const issues: ValidationIssue[] = [];
 

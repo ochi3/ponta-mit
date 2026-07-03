@@ -17,7 +17,6 @@ import type {
 } from "../types";
 import { JOBS } from "../data/jobs/jobs.registry";
 import { isBuiltinTimelineId } from "../data/timelines/registry";
-import { decodeShareUrl } from "../logic/share";
 import { fetchSharedPlanSnapshot, saveSharedPlanSnapshot } from "../logic/sharedPlans";
 import {
   applySyncPointRemoval,
@@ -142,9 +141,16 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   } | null>(null);
   const team = useStore((s) => s.team);
   const usages = useStore((s) => s.usages);
+  const activePhaseId = useStore((s) => s.activePhaseId);
+  const singleJobFilter = useStore((s) => s.singleJobFilter);
+  const setActivePhaseId = useStore((s) => s.setActivePhaseId);
+  const usageSeconds = useMemo(
+    () => usages.map((usage) => usage.t_sec),
+    [usages]
+  );
   const seconds = useMemo(
-    () => secondsInPhase(tl, undefined, usages.map((usage) => usage.t_sec)),
-    [tl, usages]
+    () => secondsInPhase(tl, activePhaseId ?? undefined, usageSeconds),
+    [activePhaseId, tl, usageSeconds]
   );
   const momentNotes = useStore((s) => s.momentNotes);
   const layoutPrefs = useStore((s) => s.plansByTimeline[tl.id]?.layoutPrefs);
@@ -164,12 +170,10 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
   const setPracticeSelectedJob = useStore((s) => s.setPracticeSelectedJob);
   const setPracticeJobVideoSource = useStore((s) => s.setPracticeJobVideoSource);
   const resetTimelineState = useStore((s) => s.resetTimelineState);
-  const applySharePayload = useStore((s) => s.applySharePayload);
   const applyPersistedSharedState = useStore((s) => s.applyPersistedSharedState);
   const applyExternalUsage = useStore((s) => s.applyExternalUsage);
   const removeUsage = useStore((s) => s.removeUsage);
   const markTimelineSaved = useStore((s) => s.markTimelineSaved);
-  const shareFromUrlApplied = useRef(false);
   const practiceLayoutRef = useRef<HTMLDivElement | null>(null);
   const practiceTimelinePaneRef = useRef<HTMLDivElement | null>(null);
   const practiceVideoSecRef = useRef<number | null>(null);
@@ -179,8 +183,8 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     [contentPractice, roomPractice, tl.practice]
   );
   const practiceSeconds = useMemo(
-    () => secondsInPhase(tl, undefined, usages.map((usage) => usage.t_sec)),
-    [tl, usages]
+    () => secondsInPhase(tl, activePhaseId ?? undefined, usageSeconds),
+    [activePhaseId, tl, usageSeconds]
   );
   const syncTargetOptions = useMemo(
     () =>
@@ -349,36 +353,6 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
       )
     );
   }, [practiceSelectedJobId, team]);
-
-  useEffect(() => {
-    function applyFromUrl() {
-      if (shareFromUrlApplied.current) return;
-      if (typeof window === "undefined") return;
-      const payload = decodeShareUrl(window.location.href);
-      if (!payload) return;
-      shareFromUrlApplied.current = true;
-      applySharePayload(payload);
-      const url = new URL(window.location.href);
-      if (url.searchParams.has("plan")) {
-        url.searchParams.delete("plan");
-        window.history.replaceState(
-          {},
-          "",
-          `${url.pathname}${url.search}${url.hash}`
-        );
-      }
-    }
-
-    const api = useStore.persist;
-    if (api.hasHydrated()) {
-      applyFromUrl();
-      return;
-    }
-    const unsub = api.onFinishHydration(applyFromUrl);
-    return () => {
-      unsub?.();
-    };
-  }, [applySharePayload]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -557,10 +531,18 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
     };
   }, [tl.id]);
 
-  function handlePhaseNavigate(_phaseId: string | undefined, scrollSec?: number) {
+  function handlePhaseNavigate(phaseId?: string, scrollSec?: number) {
+    if (phaseId === undefined && scrollSec === undefined) {
+      setActivePhaseId(null);
+      return;
+    }
+
+    setActivePhaseId(phaseId ?? null);
+
     if (scrollSec === undefined) {
       return;
     }
+
     const requestKey = Date.now();
     setPhaseNavFocus({ t_sec: scrollSec, requestKey });
     if (isPracticeMode) {
@@ -851,6 +833,7 @@ export default function MitigationPlannerPage({ tl }: { tl: Timeline }) {
             tl={tl}
             seconds={seconds}
             devTimelineSecondsRevision={devSecondsRevision}
+            jobFilter={singleJobFilter}
             focusSecond={timelineFocusSecond}
             focusLineIndex={validationFocus?.location.lineIndex}
             focusSkillId={validationFocus?.location.skillId}

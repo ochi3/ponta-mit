@@ -1,18 +1,16 @@
-import { useState } from "react";
 import type { Timeline } from "../types";
 import { resolvePhaseScrollSec } from "../logic/timelineView";
 
 export default function PhaseTabs({
   tl,
+  activePhaseId,
   onPhaseNavigate,
 }: {
   tl: Timeline;
+  activePhaseId: string | null;
   onPhaseNavigate: (phaseId?: string, scrollSec?: number) => void;
 }) {
-  const [active, setActive] = useState<string | undefined>(undefined);
-
   function select(phaseId?: string) {
-    setActive(phaseId);
     onPhaseNavigate(phaseId, resolvePhaseScrollSec(tl, phaseId));
   }
 
@@ -20,7 +18,7 @@ export default function PhaseTabs({
     <div className="flex gap-2">
       <button
         type="button"
-        className={`phase-chip ${!active ? "phase-chip--active" : ""}`}
+        className={`phase-chip ${!activePhaseId ? "phase-chip--active" : ""}`}
         onClick={() => select(undefined)}
       >
         All
@@ -31,7 +29,7 @@ export default function PhaseTabs({
           <button
             key={phase.id}
             type="button"
-            className={`phase-chip ${active === phase.id ? "phase-chip--active" : ""}`}
+            className={`phase-chip ${activePhaseId === phase.id ? "phase-chip--active" : ""}`}
             onClick={() => select(phase.id)}
             title={phase.title}
           >
