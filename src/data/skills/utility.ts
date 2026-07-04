@@ -45,7 +45,7 @@ export const SKILLS_UTILITY_UNKNOWN = [
     id: "utility.unknown.lb",
     name: "リミットブレイク",
     fflogsAliases: ["Limit Break", "リミットブレイク"],
-    cooldown_s: 0,
+    cooldown_s: 1,
     duration_s: 15,
     scope: "range_party",
     kinds: ["mitigation"],
