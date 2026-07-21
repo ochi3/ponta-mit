@@ -8,11 +8,7 @@ import {
     loadBuiltinTimeline,
     resolveTimelineId,
 } from "../data/timelines/registry";
-import {
-    DEFAULT_ACTIVITY_RECORD_ID,
-    getBuiltinActivityRecordBook,
-} from "../data/activity-records/registry";
-import { computeActivityRecordStats } from "../logic/activityRecordStats";
+import { buildActivityNavSummaries } from "../logic/activityRecordStats";
 import SiteBrandingNav from "./SiteBrandingNav";
 import { parseTimelineJson } from "../logic/timelineImport";
 import { serializeTimelineJson } from "../logic/timelineExport";
@@ -213,12 +209,7 @@ export default function TopBar({
     }
 
     const timelineTitle = resolveIntlString(tl.title, undefined);
-    const activitySummary = useMemo(() => {
-        const book = getBuiltinActivityRecordBook(DEFAULT_ACTIVITY_RECORD_ID);
-        if (!book) return undefined;
-        const stats = computeActivityRecordStats(book.entries);
-        return { dayCount: stats.dayCount, durationLabel: stats.label };
-    }, []);
+    const activitySummaries = useMemo(() => buildActivityNavSummaries(), []);
 
     const actionButtonClass = isLight
         ? "px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 border border-indigo-200/80 text-slate-900 bg-white/70 hover:border-indigo-400 hover:bg-indigo-50"
@@ -260,7 +251,7 @@ export default function TopBar({
                 current="planner"
                 isLight={isLight}
                 onToggleTheme={onToggleTheme}
-                activitySummary={activitySummary}
+                activitySummaries={activitySummaries}
             />
 
             <div className="flex flex-wrap items-center gap-2">

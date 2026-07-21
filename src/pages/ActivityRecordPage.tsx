@@ -9,7 +9,10 @@ import {
   buildActivityShareHref,
   getActivityBookIdFromSearch,
 } from "../logic/appRoute";
-import { computeActivityRecordStats } from "../logic/activityRecordStats";
+import {
+  buildActivityNavSummaries,
+  computeActivityRecordStats,
+} from "../logic/activityRecordStats";
 import ActivityLogLinks from "../components/ActivityLogLinks";
 import SiteBrandingNav from "../components/SiteBrandingNav";
 
@@ -27,10 +30,7 @@ export default function ActivityRecordPage() {
     () => computeActivityRecordStats(book?.entries ?? []),
     [book?.entries]
   );
-  const activitySummary = useMemo(
-    () => ({ dayCount: stats.dayCount, durationLabel: stats.label }),
-    [stats.dayCount, stats.label]
-  );
+  const activitySummaries = useMemo(() => buildActivityNavSummaries(), []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -66,7 +66,7 @@ export default function ActivityRecordPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
-          <SiteBrandingNav current="activity" activitySummary={activitySummary} />
+          <SiteBrandingNav current="activity" activitySummaries={activitySummaries} />
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"

@@ -107,12 +107,27 @@ function loadBuiltinActivityRecordBooks() {
 
 const BUILTIN_ACTIVITY_RECORD_BOOKS = loadBuiltinActivityRecordBooks();
 
+/** プルダウン先頭・ナビ集計の優先ブック（絶妖星乱舞 DMU） */
+export const DEFAULT_ACTIVITY_RECORD_ID = "raid-progress";
+
+const ACTIVITY_RECORD_OPTION_PRIORITY: readonly string[] = [
+  DEFAULT_ACTIVITY_RECORD_ID,
+  "fru",
+  "top",
+];
+
 export const ACTIVITY_RECORD_OPTIONS = [...BUILTIN_ACTIVITY_RECORD_BOOKS.values()]
   .map((book) => ({ id: book.id, label: book.title }))
-  .sort((a, b) => a.label.localeCompare(b.label, "ja"));
-
-export const DEFAULT_ACTIVITY_RECORD_ID =
-  ACTIVITY_RECORD_OPTIONS[0]?.id ?? "raid-progress";
+  .sort((a, b) => {
+    const aPriority = ACTIVITY_RECORD_OPTION_PRIORITY.indexOf(a.id);
+    const bPriority = ACTIVITY_RECORD_OPTION_PRIORITY.indexOf(b.id);
+    const aRank = aPriority === -1 ? Number.POSITIVE_INFINITY : aPriority;
+    const bRank = bPriority === -1 ? Number.POSITIVE_INFINITY : bPriority;
+    if (aRank !== bRank) {
+      return aRank - bRank;
+    }
+    return a.label.localeCompare(b.label, "ja");
+  });
 
 export function getBuiltinActivityRecordBook(id: string): ActivityRecordBook | null {
   const book = BUILTIN_ACTIVITY_RECORD_BOOKS.get(id);
@@ -128,5 +143,8 @@ export function resolveActivityRecordId(id: string | undefined | null): string {
   if (normalized && BUILTIN_ACTIVITY_RECORD_BOOKS.has(normalized)) {
     return normalized;
   }
-  return DEFAULT_ACTIVITY_RECORD_ID;
+  if (BUILTIN_ACTIVITY_RECORD_BOOKS.has(DEFAULT_ACTIVITY_RECORD_ID)) {
+    return DEFAULT_ACTIVITY_RECORD_ID;
+  }
+  return ACTIVITY_RECORD_OPTIONS[0]?.id ?? DEFAULT_ACTIVITY_RECORD_ID;
 }
