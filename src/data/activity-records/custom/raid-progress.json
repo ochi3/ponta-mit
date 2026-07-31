@@ -5,9 +5,21 @@
   "description": "絶妖星乱舞 活動ログ",
   "entries": [
     {
-      "date": "2026-07-24",
+      "date": "2026-07-31",
       "duration_min": 180,
-      "progress": "まだやってないけどP4",
+      "progress": "P5!",
+      "fflogs_url": "https://ja.fflogs.com/reports/dTFC3Zxm9BpjGJXN"
+    },
+    {
+      "date": "2026-07-29",
+      "duration_min": 180,
+      "progress": "",
+      "fflogs_url": "https://ja.fflogs.com/reports/qwbW3kF24vmgTA8D"
+    },
+    {
+      "date": "2026-07-24",
+      "duration_min": 120,
+      "progress": "",
       "fflogs_url": "https://ja.fflogs.com/reports/rWN4DXbnhzC36wkj"
     },
     {
