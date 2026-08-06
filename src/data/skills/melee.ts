@@ -25,6 +25,8 @@ export const SKILLS_MELEE_MNK = [
     cooldown_s: 90,
     duration_s: 15,
     scope: "range_party",
+    phys_pct: 1,
+    magic_pct: 1,
     unique_pct: 1,
     kinds: ["mitigation"],
     icon: SKILL_ICON["melee.mnk.mantra"],
