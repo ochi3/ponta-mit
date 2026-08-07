@@ -115,7 +115,7 @@ export const SKILLS_TANK_PLD = [
     name: "パッセージ・オブ・アームズ",
     fflogsAliases: ["Passage of Arms"],
     cooldown_s: 120,
-    duration_s: 18,
+    duration_s: 5,
     scope: "range_party",
     kinds: ["mitigation"],
     phys_pct: 0.85,
