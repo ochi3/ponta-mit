@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DMU エクサ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./embed.css" />
+</head>
+<body class="embed">
+  <div class="app embed-app">
+    <main class="stage">
+      <canvas id="arena" width="900" height="900" aria-label="エクサフレア"></canvas>
+
+      <div class="hud">
+        <div class="hud-wave" id="waveLabel">Wave 1</div>
+        <div class="hud-meta" id="waveMeta">—</div>
+        <div class="hud-route">
+          <span class="hud-route-label">安置</span>
+          <span class="route-current" id="routeCurrent">—</span>
+        </div>
+        <div class="hud-meta" id="simMeta">静的</div>
+      </div>
+
+      <div class="hud-playback">
+        <div class="hud-mode" role="group" aria-label="表示モード">
+          <button type="button" class="mode-btn" id="viewModeStaticBtn" data-mode="static" aria-pressed="true">
+            静的
+          </button>
+          <button type="button" class="mode-btn" id="viewModeSimBtn" data-mode="sim" aria-pressed="false">
+            再生
+          </button>
+        </div>
+        <div class="hud-play-row" id="simControls">
+          <button type="button" class="btn-chip" id="simPlayBtn">再生</button>
+          <button type="button" class="btn-chip" id="simPauseBtn">一時停止</button>
+          <button type="button" class="btn-chip" id="simResetBtn">リセット</button>
+        </div>
+      </div>
+    </main>
+
+    <aside class="panel">
+      <section class="control-block">
+        <h2>Wave</h2>
+        <div class="seg-toggle" id="waveSelectMode" role="group" aria-label="Wave単位">
+          <button type="button" class="seg-btn" data-wave-mode="single" aria-pressed="true">1個</button>
+          <button type="button" class="seg-btn" data-wave-mode="pair" aria-pressed="false">2個</button>
+        </div>
+        <div class="wave-stepper">
+          <button type="button" class="btn-step" id="wavePrevBtn" aria-label="前へ">←</button>
+          <div class="wave-pair" id="wavePairLabel">Wave 1</div>
+          <button type="button" class="btn-step" id="waveNextBtn" aria-label="次へ">→</button>
+        </div>
+        <div class="wave-grid" id="waveButtons" role="group" aria-label="Wave選択"></div>
+      </section>
+
+      <section class="control-block">
+        <h2>レーン順</h2>
+        <label class="field">
+          <span>NW</span>
+          <select id="nwOrder">
+            <option value="0,1,2">左 → 中 → 右</option>
+            <option value="0,2,1">左 → 右 → 中</option>
+            <option value="1,0,2">中 → 左 → 右</option>
+            <option value="1,2,0">中 → 右 → 左</option>
+            <option value="2,0,1">右 → 左 → 中</option>
+            <option value="2,1,0">右 → 中 → 左</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>NE</span>
+          <select id="neOrder">
+            <option value="0,1,2">左 → 中 → 右</option>
+            <option value="0,2,1">左 → 右 → 中</option>
+            <option value="1,0,2">中 → 左 → 右</option>
+            <option value="1,2,0">中 → 右 → 左</option>
+            <option value="2,0,1">右 → 左 → 中</option>
+            <option value="2,1,0">右 → 中 → 左</option>
+          </select>
+        </label>
+        <button type="button" class="btn-secondary" id="randomizeBtn">ランダム</button>
+      </section>
+
+      <section class="control-block">
+        <h2>再生オプション</h2>
+        <label class="field">
+          <span>速度</span>
+          <select id="simSpeed">
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>時間 <em id="simTimeLabel">0.0s</em></span>
+          <input type="range" id="simScrub" min="0" max="1000" value="0" step="1" />
+        </label>
+        <label class="check">
+          <input type="checkbox" id="simAllWaves" checked />
+          <span>全Wave連続</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="simShowTelegraph" checked />
+          <span>予兆矢印</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="simLoop" />
+          <span>ループ</span>
+        </label>
+      </section>
+
+      <section class="control-block">
+        <h2>表示</h2>
+        <label class="check">
+          <input type="checkbox" id="showSafeCircles" checked />
+          <span>安置◯</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="showLanes" checked />
+          <span>レーン</span>
+        </label>
+      </section>
+
+      <!-- ウェイマークUIは非表示。Diamond既定をJS側で維持 -->
+      <div hidden>
+        <div id="markerPalette"></div>
+        <ul id="markerList"></ul>
+        <button type="button" id="markerNoneBtn"></button>
+        <button type="button" id="markerClearBtn"></button>
+        <button type="button" data-preset="preset_1"></button>
+        <button type="button" id="importBtn"></button>
+        <textarea id="importText"></textarea>
+        <span id="importStatus"></span>
+        <span id="cursorMeta"></span>
+        <span id="stageTip"></span>
+        <span id="waveHint"></span>
+        <select id="viewMode">
+          <option value="static">静的</option>
+          <option value="sim">シミュ</option>
+        </select>
+      </div>
+    </aside>
+  </div>
+  <script src="./app.js"></script>
+</body>
+</html>

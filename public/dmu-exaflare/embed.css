@@ -1,0 +1,243 @@
+/* サイト埋め込み用: 余白とブランド枠を削る */
+html,
+body.embed {
+  height: 100%;
+  overflow: hidden;
+  background: #0b1219;
+}
+
+body.embed {
+  min-height: 100%;
+}
+
+.embed-app {
+  max-width: none;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 12px;
+  gap: 12px 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+  grid-template-areas: "stage panel";
+  align-content: stretch;
+}
+
+.embed-app .stage {
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.embed-app #arena {
+  width: min(100%, 100cqh, calc(100vh - 24px));
+  max-height: calc(100vh - 24px);
+}
+
+.embed-app .panel {
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.embed-app .control-block {
+  padding: 12px;
+}
+
+.embed-app .control-block h2 {
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.embed-app .route-current {
+  font-size: 1.15rem;
+}
+
+.embed-app .btn-secondary {
+  width: 100%;
+}
+
+/* 左上HUD: 安置ルート */
+.hud-route {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+  max-width: min(52vw, 420px);
+}
+
+.hud-route-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--amber);
+  text-transform: uppercase;
+}
+
+.hud .route-current {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  line-height: 1.25;
+}
+
+.hud-route-path {
+  font-family: Syne, "IBM Plex Sans JP", sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff7d6;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+
+.hud-route-note,
+.hud-route-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* 右上: モード + 再生 */
+.hud-playback {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.hud-mode {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(12, 18, 24, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.hud-play-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(12, 18, 24, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.hud-play-row .btn-chip {
+  margin: 0;
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.hud-play-row .btn-chip:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.hud-play-row.is-disabled {
+  opacity: 0.45;
+}
+
+.mode-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 9px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.mode-btn:hover {
+  color: var(--text);
+}
+
+.mode-btn[aria-pressed="true"] {
+  background: linear-gradient(160deg, #3a2d14, #2a2416);
+  color: var(--focus);
+  box-shadow: 0 0 0 1px rgba(245, 210, 122, 0.25);
+}
+
+.app.is-sim .mode-btn[data-mode="sim"][aria-pressed="true"] {
+  background: linear-gradient(160deg, #143a2d, #162a24);
+  color: #8dffc6;
+  box-shadow: 0 0 0 1px rgba(94, 214, 160, 0.35);
+}
+
+/* Wave 1個 / 2個 */
+.seg-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.seg-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--muted);
+  border-radius: 10px;
+  padding: 10px 0;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.seg-btn:hover {
+  transform: translateY(-1px);
+  color: var(--text);
+  border-color: rgba(245, 210, 122, 0.4);
+}
+
+.seg-btn[aria-pressed="true"] {
+  background: linear-gradient(160deg, #3a2d14, #2a2416);
+  border-color: var(--focus);
+  color: var(--focus);
+  box-shadow: 0 0 0 1px rgba(245, 210, 122, 0.2);
+}
+
+@media (max-width: 900px) {
+  .embed-app {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "stage"
+      "panel";
+    height: auto;
+    overflow: auto;
+  }
+
+  .embed-app .stage,
+  .embed-app .panel {
+    height: auto;
+  }
+
+  .embed-app #arena {
+    width: 100%;
+    max-height: none;
+  }
+}

@@ -1,4 +1,4 @@
-export type AppView = "planner" | "activity";
+export type AppView = "planner" | "activity" | "dmuExa";
 
 export const ACTIVITY_BOOK_QUERY_KEY = "book";
 
@@ -6,6 +6,13 @@ export function parseAppView(hash = ""): AppView {
   const normalized = hash.replace(/^#\/?/, "").split("?")[0]?.trim() ?? "";
   if (normalized === "activity" || normalized.startsWith("activity/")) {
     return "activity";
+  }
+  if (
+    normalized === "dmu-exa" ||
+    normalized === "dmuExa" ||
+    normalized.startsWith("dmu-exa/")
+  ) {
+    return "dmuExa";
   }
   return "planner";
 }
@@ -28,7 +35,9 @@ export function getActivityBookIdFromSearch(search?: string): string | null {
 
 export function buildAppHref(view: AppView, bookId?: string): string {
   if (typeof window === "undefined") {
-    return view === "activity" ? "#/activity" : "";
+    if (view === "activity") return "#/activity";
+    if (view === "dmuExa") return "#/dmu-exa";
+    return "";
   }
 
   const params = new URLSearchParams(window.location.search);
@@ -42,7 +51,11 @@ export function buildAppHref(view: AppView, bookId?: string): string {
 
   params.delete(ACTIVITY_BOOK_QUERY_KEY);
   const qs = params.toString();
-  return `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+  const path = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+  if (view === "dmuExa") {
+    return `${path}#/dmu-exa`;
+  }
+  return path;
 }
 
 export function buildActivityShareHref(bookId: string): string {

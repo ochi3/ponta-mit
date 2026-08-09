@@ -42,6 +42,7 @@ const ja = {
     siteName: "PONTA",
     planner: "軽減表",
     activity: "活動記録",
+    dmuExa: "DMU エクサ",
     activitySummary: "{days}日 · {duration}",
   },
   timeline: {

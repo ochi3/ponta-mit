@@ -41,6 +41,7 @@ const de = {
     siteName: "PONTA",
     planner: "Mitigationsplan",
     activity: "Aktivitätsprotokoll",
+    dmuExa: "DMU Exa",
     activitySummary: "{days} Tg. · {duration}",
   },
   timeline: {

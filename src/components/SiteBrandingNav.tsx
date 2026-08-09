@@ -2,7 +2,7 @@ import { buildAppHref } from "../logic/appRoute";
 import { useI18n } from "../i18n";
 import type { ActivityNavBookSummary } from "../logic/activityRecordStats";
 
-type AppSection = "planner" | "activity";
+type AppSection = "planner" | "activity" | "dmuExa";
 
 type Props = {
   current: AppSection;
@@ -191,6 +191,20 @@ export default function SiteBrandingNav({
           </span>
         ) : null}
       </span>
+
+      <span className={separatorClass} aria-hidden="true">
+        /
+      </span>
+
+      {current === "dmuExa" ? (
+        <span className={navCurrentClass(isLight)} aria-current="page">
+          {t("nav.dmuExa")}
+        </span>
+      ) : (
+        <a href={buildAppHref("dmuExa")} className={navLinkClass(isLight)}>
+          {t("nav.dmuExa")}
+        </a>
+      )}
     </nav>
   );
 }

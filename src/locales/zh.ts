@@ -41,6 +41,7 @@ const zh = {
     siteName: "PONTA",
     planner: "减伤表",
     activity: "活动记录",
+    dmuExa: "DMU エクサ",
     activitySummary: "{days}天 · {duration}",
   },
   timeline: {

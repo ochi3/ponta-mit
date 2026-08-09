@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import MitigationPlannerPage from "./pages/MitigationPlannerPage";
 import ActivityRecordPage from "./pages/ActivityRecordPage";
+import DmuExaflarePage from "./pages/DmuExaflarePage";
 import { PLANNER_STORAGE_KEY, useStore } from "./state/store";
 import type { Timeline } from "./types";
 import {
@@ -147,6 +148,10 @@ export default function App() {
 
   if (view === "activity") {
     return <ActivityRecordPage />;
+  }
+
+  if (view === "dmuExa") {
+    return <DmuExaflarePage />;
   }
 
   return <PlannerApp />;

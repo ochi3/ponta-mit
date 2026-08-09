@@ -41,6 +41,7 @@ const fr = {
     siteName: "PONTA",
     planner: "Plan de mitigation",
     activity: "Journal d'activité",
+    dmuExa: "DMU Exa",
     activitySummary: "{days} j · {duration}",
   },
   timeline: {
